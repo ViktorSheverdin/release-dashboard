@@ -1,0 +1,110 @@
+import { internalMutation, internalQuery } from "./_generated/server";
+import { v } from "convex/values";
+import { internal } from "./_generated/api";
+
+// ── Mutation: store release + items, schedule AI processing ─────────────────
+export const createRelease = internalMutation({
+  args: {
+    items: v.array(
+      v.object({
+        prNumber: v.number(),
+        prTitle: v.string(),
+        prUrl: v.string(),
+        prAuthor: v.string(),
+        prMergedAt: v.string(),
+        prDiff: v.optional(v.string()),
+        linearTicketId: v.optional(v.string()),
+        linearTitle: v.optional(v.string()),
+        linearDescription: v.optional(v.string()),
+        linearUrl: v.optional(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const matchedCount = args.items.filter((i) => i.linearTicketId).length;
+
+    const releaseId = await ctx.db.insert("releases", {
+      syncedAt: Date.now(),
+      status: "syncing",
+      prCount: args.items.length,
+      matchedCount,
+    });
+
+    for (const item of args.items) {
+      const itemId = await ctx.db.insert("syncItems", {
+        releaseId,
+        ...item,
+        status: "pending",
+        slackSent: false,
+      });
+
+      // Schedule background AI analysis for each item
+      await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
+        itemId,
+      });
+    }
+
+    return releaseId;
+  },
+});
+
+// ── Internal query to fetch a single item ───────────────────────────────────
+export const getItem = internalQuery({
+  args: { itemId: v.id("syncItems") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.itemId);
+  },
+});
+
+// ── Mutation: update item status ────────────────────────────────────────────
+export const updateItemStatus = internalMutation({
+  args: {
+    itemId: v.id("syncItems"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("analyzing"),
+      v.literal("analyzed"),
+      v.literal("error")
+    ),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.itemId, { status: args.status });
+  },
+});
+
+// ── Mutation: update item with AI analysis results ──────────────────────────
+export const updateItemAnalysis = internalMutation({
+  args: {
+    itemId: v.id("syncItems"),
+    technicalSummary: v.string(),
+    businessSummary: v.string(),
+    keyChanges: v.array(v.string()),
+    impactedAreas: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.itemId, {
+      status: "analyzed",
+      technicalSummary: args.technicalSummary,
+      businessSummary: args.businessSummary,
+      keyChanges: args.keyChanges,
+      impactedAreas: args.impactedAreas,
+    });
+
+    // Check if all items in this release are done
+    const item = await ctx.db.get(args.itemId);
+    if (!item) return;
+
+    const allItems = await ctx.db
+      .query("syncItems")
+      .withIndex("by_releaseId", (q) => q.eq("releaseId", item.releaseId))
+      .collect();
+
+    const allDone = allItems.every(
+      (i) => i.status === "analyzed" || i.status === "error"
+    );
+
+    if (allDone) {
+      await ctx.db.patch(item.releaseId, { status: "synced" });
+    }
+  },
+});
