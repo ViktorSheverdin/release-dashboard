@@ -9,7 +9,7 @@ const { data: release } = useConvexQuery(api.releases.get, { id: releaseId })
 const { data: items } = useConvexQuery(api.releases.getItems, { releaseId })
 const { execute: sendToSlack } = useConvexAction(api.slack.sendToSlack)
 const { execute: sendReleaseToSlack } = useConvexAction(api.slack.sendReleaseToSlack)
-console.log(items)
+
 const sendingSlack = ref<Record<string, boolean>>({})
 const sendingAll = ref(false)
 
