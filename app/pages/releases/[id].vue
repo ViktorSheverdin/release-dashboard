@@ -119,7 +119,7 @@ const groupedItems = computed(() => {
       <div class="space-y-8">
         <div v-for="group in groupedItems" :key="group.label">
           <!-- Group header -->
-          <div class="flex items-center gap-2 mb-3">
+          <div class="mb-3">
             <h3 class="text-lg font-semibold">
               <a
                 v-if="group.ticketUrl"
@@ -130,10 +130,10 @@ const groupedItems = computed(() => {
                 {{ group.label }}
               </a>
               <span v-else class="text-gray-300">{{ group.label }}</span>
+              <span class="text-gray-500 font-normal">
+                ({{ group.items.length }} PR{{ group.items.length !== 1 ? 's' : '' }} synced)
+              </span>
             </h3>
-            <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
-              {{ group.items.length }} PR{{ group.items.length !== 1 ? 's' : '' }}
-            </span>
           </div>
 
           <!-- Items in group -->
