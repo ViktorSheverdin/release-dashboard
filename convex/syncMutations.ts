@@ -2,27 +2,77 @@ import { internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
-// ── Mutation: store release + items, schedule AI processing ─────────────────
-export const createRelease = internalMutation({
+const syncItemValidator = v.object({
+  prNumber: v.number(),
+  prTitle: v.string(),
+  prUrl: v.string(),
+  prAuthor: v.string(),
+  prMergedAt: v.string(),
+  prDiff: v.optional(v.string()),
+  linearTicketId: v.optional(v.string()),
+  linearTitle: v.optional(v.string()),
+  linearDescription: v.optional(v.string()),
+  linearUrl: v.optional(v.string()),
+});
+
+// ── Mutation: add items to the latest release, or create one ────────────────
+// This ensures multiple syncs add to the same release instead of creating new ones
+export const addToRelease = internalMutation({
   args: {
-    items: v.array(
-      v.object({
-        prNumber: v.number(),
-        prTitle: v.string(),
-        prUrl: v.string(),
-        prAuthor: v.string(),
-        prMergedAt: v.string(),
-        prDiff: v.optional(v.string()),
-        linearTicketId: v.optional(v.string()),
-        linearTitle: v.optional(v.string()),
-        linearDescription: v.optional(v.string()),
-        linearUrl: v.optional(v.string()),
-      })
-    ),
+    items: v.array(syncItemValidator),
   },
   handler: async (ctx, args) => {
-    const matchedCount = args.items.filter((i) => i.linearTicketId).length;
+    // Find the latest release
+    const latestRelease = await ctx.db
+      .query("releases")
+      .order("desc")
+      .first();
 
+    let releaseId;
+
+    if (latestRelease) {
+      // Add to existing release — update counts
+      const newMatched = args.items.filter((i) => i.linearTicketId).length;
+      await ctx.db.patch(latestRelease._id, {
+        syncedAt: Date.now(),
+        status: "syncing",
+        prCount: latestRelease.prCount + args.items.length,
+        matchedCount: latestRelease.matchedCount + newMatched,
+      });
+      releaseId = latestRelease._id;
+    } else {
+      // First sync ever — create new release
+      const matchedCount = args.items.filter((i) => i.linearTicketId).length;
+      releaseId = await ctx.db.insert("releases", {
+        syncedAt: Date.now(),
+        status: "syncing",
+        prCount: args.items.length,
+        matchedCount,
+      });
+    }
+
+    for (const item of args.items) {
+      const itemId = await ctx.db.insert("syncItems", {
+        releaseId,
+        ...item,
+        status: "pending",
+        slackSent: false,
+      });
+
+      await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
+        itemId,
+      });
+    }
+
+    return releaseId;
+  },
+});
+
+// Keep createRelease for backwards compat, but prefer addToRelease
+export const createRelease = internalMutation({
+  args: { items: v.array(syncItemValidator) },
+  handler: async (ctx, args) => {
+    const matchedCount = args.items.filter((i) => i.linearTicketId).length;
     const releaseId = await ctx.db.insert("releases", {
       syncedAt: Date.now(),
       status: "syncing",
@@ -37,13 +87,10 @@ export const createRelease = internalMutation({
         status: "pending",
         slackSent: false,
       });
-
-      // Schedule background AI analysis for each item
       await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
         itemId,
       });
     }
-
     return releaseId;
   },
 });
@@ -99,7 +146,6 @@ export const updateItemAnalysis = internalMutation({
       impactedAreas: args.impactedAreas,
     });
 
-    // Check if all items in this release are done
     const item = await ctx.db.get(args.itemId);
     if (!item) return;
 

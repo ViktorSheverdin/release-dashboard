@@ -6,13 +6,10 @@ import { Octokit } from "octokit";
 import { LinearClient } from "@linear/sdk";
 
 // ── Ticket ID extraction ────────────────────────────────────────────────────
-// Matches:
-// 1. Direct IDs like ENG-123, PROJ-45 (case insensitive)
-// 2. Linear URLs like https://linear.app/team/issue/ENG-123/some-title
 function extractTicketIds(text: string, teamPrefix: string): string[] {
   const ids: string[] = [];
 
-  // Match direct ticket IDs (e.g., ENG-123)
+  // Match direct ticket IDs (e.g., ARD-123)
   const directRegex = new RegExp(`(${teamPrefix}-\\d+)`, "gi");
   const directMatches = text.match(directRegex);
   if (directMatches) ids.push(...directMatches);
@@ -27,7 +24,6 @@ function extractTicketIds(text: string, teamPrefix: string): string[] {
     ids.push(urlMatch[1]);
   }
 
-  // Normalize to uppercase and deduplicate
   return [...new Set(ids.map((m) => m.toUpperCase()))];
 }
 
@@ -39,7 +35,7 @@ export const triggerSync = action({
     const linearApiKey = process.env.LINEAR_API_KEY!;
     const owner = process.env.GITHUB_OWNER!;
     const repo = process.env.GITHUB_REPO!;
-    const linearTeamKey = process.env.LINEAR_TEAM_KEY!;
+    const linearTeamKey = process.env.LINEAR_TEAM_KEY!; // e.g. "ARD"
 
     // 1. Fetch merged PRs from GitHub
     const octokit = new Octokit({ auth: githubToken });
@@ -65,31 +61,36 @@ export const triggerSync = action({
       return "no_new_prs";
     }
 
-    // 3. Fetch Linear tickets
+    // 3. Fetch Linear tickets — find team by key prefix, not UUID
     const linear = new LinearClient({ apiKey: linearApiKey });
-    const team = await linear.team(linearTeamKey);
-    const { nodes: issues } = await team.issues({
-      first: 100,
-      filter: { state: { type: { in: ["completed", "started"] } } },
-    });
+    const { nodes: teams } = await linear.teams();
+    const team = teams.find((t) => t.key === linearTeamKey);
 
-    // Build a map of ticket ID → Linear issue for fast lookup
     const ticketMap = new Map<
       string,
       { id: string; title: string; description?: string; url: string }
     >();
-    for (const issue of issues) {
-      ticketMap.set(issue.identifier, {
-        id: issue.identifier,
-        title: issue.title,
-        description: issue.description ?? undefined,
-        url: issue.url,
+
+    if (team) {
+      const { nodes: issues } = await team.issues({
+        first: 100,
       });
+
+      for (const issue of issues) {
+        ticketMap.set(issue.identifier, {
+          id: issue.identifier,
+          title: issue.title,
+          description: issue.description ?? undefined,
+          url: issue.url,
+        });
+      }
+      console.log(`Found ${ticketMap.size} Linear tickets in team ${team.name} (${team.key})`);
+    } else {
+      console.warn(`No Linear team found with key "${linearTeamKey}". Available teams: ${teams.map(t => t.key).join(", ")}`);
     }
 
     // 4. Correlate PRs with Linear tickets
     const items = newPrs.map((pr) => {
-      // Search branch name, PR title, and PR body for ticket IDs
       const branchTickets = extractTicketIds(pr.head?.ref ?? "", linearTeamKey);
       const titleTickets = extractTicketIds(pr.title ?? "", linearTeamKey);
       const bodyTickets = extractTicketIds(pr.body ?? "", linearTeamKey);
@@ -97,10 +98,11 @@ export const triggerSync = action({
         ...new Set([...branchTickets, ...titleTickets, ...bodyTickets]),
       ];
 
-      // Find first matching Linear ticket
       const matchedTicket = allTicketIds
         .map((id) => ticketMap.get(id))
         .find((t) => t !== undefined);
+
+      console.log(`PR #${pr.number} "${pr.title}" — branch: ${pr.head?.ref} — found IDs: [${allTicketIds.join(", ")}] — matched: ${matchedTicket?.id ?? "none"}`);
 
       const diffSummary = pr.body?.slice(0, 500) ?? "";
 
@@ -118,9 +120,9 @@ export const triggerSync = action({
       };
     });
 
-    // 5. Call mutation to store data + schedule AI analysis
+    // 5. Add items to existing release for today, or create new one
     const releaseId = await ctx.runMutation(
-      internal.syncMutations.createRelease,
+      internal.syncMutations.addToRelease,
       { items }
     );
 
