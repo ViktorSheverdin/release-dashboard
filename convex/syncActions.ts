@@ -17,7 +17,7 @@ function extractTicketIds(text: string): string[] {
 // Uses Node.js runtime because Octokit and Linear SDK require Node built-ins
 export const triggerSync = action({
   args: {},
-  handler: async (ctx) => {
+  handler: async (ctx): Promise<string> => {
     const githubToken = process.env.GITHUB_TOKEN!;
     const linearApiKey = process.env.LINEAR_API_KEY!;
     const owner = process.env.GITHUB_OWNER!;
