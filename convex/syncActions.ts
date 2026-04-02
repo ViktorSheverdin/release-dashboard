@@ -6,14 +6,29 @@ import { Octokit } from "octokit";
 import { LinearClient } from "@linear/sdk";
 
 // ── Ticket ID extraction ────────────────────────────────────────────────────
-// Matches patterns like ENG-123, PROJ-45 — case insensitive
+// Matches:
+// 1. Direct IDs like ENG-123, PROJ-45 (case insensitive)
+// 2. Linear URLs like https://linear.app/team/issue/ENG-123/some-title
 function extractTicketIds(text: string, teamPrefix: string): string[] {
-  // Match the specific team prefix only (e.g., ENG-123, not HR-5)
-  const regex = new RegExp(`(${teamPrefix}-\\d+)`, "gi");
-  const matches = text.match(regex);
-  if (!matches) return [];
+  const ids: string[] = [];
+
+  // Match direct ticket IDs (e.g., ENG-123)
+  const directRegex = new RegExp(`(${teamPrefix}-\\d+)`, "gi");
+  const directMatches = text.match(directRegex);
+  if (directMatches) ids.push(...directMatches);
+
+  // Match Linear URLs containing ticket IDs
+  const urlRegex = new RegExp(
+    `linear\\.app/[^/]+/issue/(${teamPrefix}-\\d+)`,
+    "gi"
+  );
+  let urlMatch;
+  while ((urlMatch = urlRegex.exec(text)) !== null) {
+    ids.push(urlMatch[1]);
+  }
+
   // Normalize to uppercase and deduplicate
-  return [...new Set(matches.map((m) => m.toUpperCase()))];
+  return [...new Set(ids.map((m) => m.toUpperCase()))];
 }
 
 // ── Main sync action (entry point) ──────────────────────────────────────────

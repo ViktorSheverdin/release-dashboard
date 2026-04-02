@@ -9,7 +9,7 @@ const { data: release } = useConvexQuery(api.releases.get, { id: releaseId })
 const { data: items } = useConvexQuery(api.releases.getItems, { releaseId })
 const { execute: sendToSlack } = useConvexAction(api.slack.sendToSlack)
 const { execute: sendReleaseToSlack } = useConvexAction(api.slack.sendReleaseToSlack)
-console.log(items)
+
 const sendingSlack = ref<Record<string, boolean>>({})
 const sendingAll = ref(false)
 
@@ -39,6 +39,41 @@ const analyzedCount = computed(() =>
   items.value?.filter((i) => i.status === 'analyzed').length ?? 0
 )
 const totalCount = computed(() => items.value?.length ?? 0)
+
+// Group items: by Linear ticket, unmatched go under "Global Changes"
+const groupedItems = computed(() => {
+  if (!items.value) return []
+
+  const groups = new Map<string, { label: string; ticketUrl?: string; items: typeof items.value }>()
+
+  for (const item of items.value) {
+    if (item.linearTicketId) {
+      const key = item.linearTicketId
+      if (!groups.has(key)) {
+        groups.set(key, {
+          label: `${item.linearTicketId} — ${item.linearTitle ?? 'Unknown'}`,
+          ticketUrl: item.linearUrl,
+          items: [],
+        })
+      }
+      groups.get(key)!.items.push(item)
+    } else {
+      if (!groups.has('__global__')) {
+        groups.set('__global__', { label: 'Global Changes', items: [] })
+      }
+      groups.get('__global__')!.items.push(item)
+    }
+  }
+
+  // Put matched tickets first, Global Changes last
+  const sorted = [...groups.entries()].sort((a, b) => {
+    if (a[0] === '__global__') return 1
+    if (b[0] === '__global__') return -1
+    return 0
+  })
+
+  return sorted.map(([, group]) => group)
+})
 </script>
 
 <template>
@@ -80,15 +115,38 @@ const totalCount = computed(() => items.value?.length ?? 0)
         />
       </div>
 
-      <!-- Items -->
-      <div class="space-y-4">
-        <SyncItemCard
-          v-for="item in items"
-          :key="item._id"
-          :item="item"
-          :sending="sendingSlack[item._id] ?? false"
-          @send-slack="handleSendToSlack(item._id)"
-        />
+      <!-- Grouped items -->
+      <div class="space-y-8">
+        <div v-for="group in groupedItems" :key="group.label">
+          <!-- Group header -->
+          <div class="flex items-center gap-2 mb-3">
+            <h3 class="text-lg font-semibold">
+              <a
+                v-if="group.ticketUrl"
+                :href="group.ticketUrl"
+                target="_blank"
+                class="text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                {{ group.label }}
+              </a>
+              <span v-else class="text-gray-300">{{ group.label }}</span>
+            </h3>
+            <span class="text-xs text-gray-500 bg-gray-800 px-2 py-0.5 rounded-full">
+              {{ group.items.length }} PR{{ group.items.length !== 1 ? 's' : '' }}
+            </span>
+          </div>
+
+          <!-- Items in group -->
+          <div class="space-y-4">
+            <SyncItemCard
+              v-for="item in group.items"
+              :key="item._id"
+              :item="item"
+              :sending="sendingSlack[item._id] ?? false"
+              @send-slack="handleSendToSlack(item._id)"
+            />
+          </div>
+        </div>
       </div>
     </div>
   </div>
