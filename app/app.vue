@@ -1,9 +1,3 @@
-<script setup lang="ts">
-import { api } from '../convex/_generated/api'
-
-const { data: releases, pending } = useConvexQuery(api.releases.list, {})
-</script>
-
 <template>
   <div class="min-h-screen bg-gray-950 text-gray-100">
     <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-10">
@@ -14,12 +8,13 @@ const { data: releases, pending } = useConvexQuery(api.releases.list, {})
           </div>
           <h1 class="text-lg font-semibold tracking-tight">Release Intelligence</h1>
         </div>
+        <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-200 transition-colors">
+          Dashboard
+        </NuxtLink>
       </div>
     </header>
     <main class="max-w-6xl mx-auto px-6 py-8">
-      <h2 class="text-2xl font-bold mb-4">Release Dashboard</h2>
-      <p v-if="pending" class="text-gray-400">Connecting to Convex...</p>
-      <p v-else class="text-green-400">Connected! {{ releases?.length ?? 0 }} releases found.</p>
+      <NuxtPage />
     </main>
   </div>
 </template>

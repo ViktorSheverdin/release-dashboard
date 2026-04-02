@@ -48,6 +48,15 @@ export const createRelease = internalMutation({
   },
 });
 
+// ── Query: get all synced PR numbers (for dedup) ────────────────────────────
+export const getAllSyncedPrNumbers = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const items = await ctx.db.query("syncItems").collect();
+    return items.map((i) => ({ prNumber: i.prNumber }));
+  },
+});
+
 // ── Internal query to fetch a single item ───────────────────────────────────
 export const getItem = internalQuery({
   args: { itemId: v.id("syncItems") },
