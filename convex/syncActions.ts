@@ -6,15 +6,17 @@ import { Octokit } from "octokit";
 import { LinearClient } from "@linear/sdk";
 
 // ── Ticket ID extraction ────────────────────────────────────────────────────
-const TICKET_REGEX = /([A-Z]{2,10}-\d+)/g;
-
-function extractTicketIds(text: string): string[] {
-  const matches = text.match(TICKET_REGEX);
-  return matches ? [...new Set(matches)] : [];
+// Matches patterns like ENG-123, PROJ-45 — case insensitive
+function extractTicketIds(text: string, teamPrefix: string): string[] {
+  // Match the specific team prefix only (e.g., ENG-123, not HR-5)
+  const regex = new RegExp(`(${teamPrefix}-\\d+)`, "gi");
+  const matches = text.match(regex);
+  if (!matches) return [];
+  // Normalize to uppercase and deduplicate
+  return [...new Set(matches.map((m) => m.toUpperCase()))];
 }
 
 // ── Main sync action (entry point) ──────────────────────────────────────────
-// Uses Node.js runtime because Octokit and Linear SDK require Node built-ins
 export const triggerSync = action({
   args: {},
   handler: async (ctx): Promise<string> => {
@@ -37,7 +39,18 @@ export const triggerSync = action({
 
     const mergedPrs = prs.filter((pr) => pr.merged_at !== null);
 
-    // 2. Fetch Linear tickets
+    // 2. Check which PRs are already synced (avoid duplicates)
+    const existingItems: { prNumber: number }[] = await ctx.runQuery(
+      internal.syncMutations.getAllSyncedPrNumbers
+    );
+    const syncedPrNumbers = new Set(existingItems.map((i) => i.prNumber));
+    const newPrs = mergedPrs.filter((pr) => !syncedPrNumbers.has(pr.number));
+
+    if (newPrs.length === 0) {
+      return "no_new_prs";
+    }
+
+    // 3. Fetch Linear tickets
     const linear = new LinearClient({ apiKey: linearApiKey });
     const team = await linear.team(linearTeamKey);
     const { nodes: issues } = await team.issues({
@@ -59,12 +72,17 @@ export const triggerSync = action({
       });
     }
 
-    // 3. Correlate PRs with Linear tickets
-    const items = mergedPrs.map((pr) => {
-      const branchTickets = extractTicketIds(pr.head?.ref ?? "");
-      const bodyTickets = extractTicketIds(pr.body ?? "");
-      const allTicketIds = [...new Set([...branchTickets, ...bodyTickets])];
+    // 4. Correlate PRs with Linear tickets
+    const items = newPrs.map((pr) => {
+      // Search branch name, PR title, and PR body for ticket IDs
+      const branchTickets = extractTicketIds(pr.head?.ref ?? "", linearTeamKey);
+      const titleTickets = extractTicketIds(pr.title ?? "", linearTeamKey);
+      const bodyTickets = extractTicketIds(pr.body ?? "", linearTeamKey);
+      const allTicketIds = [
+        ...new Set([...branchTickets, ...titleTickets, ...bodyTickets]),
+      ];
 
+      // Find first matching Linear ticket
       const matchedTicket = allTicketIds
         .map((id) => ticketMap.get(id))
         .find((t) => t !== undefined);
@@ -85,7 +103,7 @@ export const triggerSync = action({
       };
     });
 
-    // 4. Call mutation to store data + schedule AI analysis
+    // 5. Call mutation to store data + schedule AI analysis
     const releaseId = await ctx.runMutation(
       internal.syncMutations.createRelease,
       { items }

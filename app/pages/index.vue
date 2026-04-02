@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { api } from '../../convex/_generated/api'
 
-const { data: releases } = useConvexQuery(api.releases.list, {})
+const { data: releases, pending: loading } = useConvexQuery(api.releases.list, {})
 const { execute: triggerSync, pending: syncing, error: syncError } = useConvexAction(api.syncActions.triggerSync)
 
 async function handleSync() {
   try {
-    await triggerSync({})
+    const result = await triggerSync({})
+    if (result === 'no_new_prs') {
+      alert('No new merged PRs found since last sync.')
+    }
   } catch {
-    // error tracked automatically by composable
+    // error tracked by composable
   }
 }
 </script>
@@ -43,9 +46,14 @@ async function handleSync() {
       {{ syncError.message }}
     </div>
 
+    <!-- Loading -->
+    <div v-if="loading" class="text-center py-20 text-gray-500">
+      <p>Connecting to Convex...</p>
+    </div>
+
     <!-- Empty state -->
     <div
-      v-if="releases && releases.length === 0"
+      v-else-if="releases && releases.length === 0"
       class="text-center py-20 text-gray-500"
     >
       <div class="text-5xl mb-4">📦</div>

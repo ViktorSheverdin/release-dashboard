@@ -147,7 +147,6 @@ const showTechnical = ref(false)
         </div>
       </div>
     </div>
-
     <!-- Error state -->
     <div v-if="item.status === 'error'" class="px-5 pb-5">
       <p class="text-sm text-red-400">Analysis failed. The item may be retried on next sync.</p>
