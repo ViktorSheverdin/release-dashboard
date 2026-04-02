@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { api } from '../convex/_generated/api'
+
+const { data: releases, pending } = useConvexQuery(api.releases.list, {})
+</script>
+
 <template>
   <div class="min-h-screen bg-gray-950 text-gray-100">
     <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-10">
@@ -12,7 +18,8 @@
     </header>
     <main class="max-w-6xl mx-auto px-6 py-8">
       <h2 class="text-2xl font-bold mb-4">Release Dashboard</h2>
-      <p class="text-gray-400">App is running. Convex not connected yet.</p>
+      <p v-if="pending" class="text-gray-400">Connecting to Convex...</p>
+      <p v-else class="text-green-400">Connected! {{ releases?.length ?? 0 }} releases found.</p>
     </main>
   </div>
 </template>
