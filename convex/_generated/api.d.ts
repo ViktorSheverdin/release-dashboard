@@ -13,6 +13,8 @@ import type * as releases from "../releases.js";
 import type * as slack from "../slack.js";
 import type * as syncActions from "../syncActions.js";
 import type * as syncMutations from "../syncMutations.js";
+import type * as tests_testGithub from "../tests/testGithub.js";
+import type * as tests_testLinear from "../tests/testLinear.js";
 
 import type {
   ApiFromModules,
@@ -26,6 +28,8 @@ declare const fullApi: ApiFromModules<{
   slack: typeof slack;
   syncActions: typeof syncActions;
   syncMutations: typeof syncMutations;
+  "tests/testGithub": typeof tests_testGithub;
+  "tests/testLinear": typeof tests_testLinear;
 }>;
 
 /**
