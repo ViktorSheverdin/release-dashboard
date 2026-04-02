@@ -18,9 +18,9 @@ A real-time release dashboard that syncs GitHub PRs with Linear tickets, generat
    └── Schedules analyzeItem Action for each item
           │
 3. analyzeItem (Internal Action — background, non-blocking)
-   ├── Calls Claude API for technical summary
-   ├── Calls Claude API for business summary
-   ├── Calls Claude API for structured data (keyChanges, impactedAreas)
+   ├── Calls Gemini API for technical summary
+   ├── Calls Gemini API for business summary
+   ├── Calls Gemini API for structured data (keyChanges, impactedAreas)
    └── Calls updateItemAnalysis Mutation
           │
 4. updateItemAnalysis (Mutation)
@@ -30,7 +30,7 @@ A real-time release dashboard that syncs GitHub PRs with Linear tickets, generat
 
 ### Why these specific Convex functions?
 
-- **Actions** for external API calls (GitHub, Linear, Anthropic, Slack). Actions can make network requests but cannot write to the DB directly.
+- **Actions** for external API calls (GitHub, Linear, Gemini, Slack). Actions can make network requests but cannot write to the DB directly.
 - **Mutations** for all database writes. Mutations are transactional — all writes succeed or none do. They can also schedule Actions, which is how we chain the async pipeline.
 - **Queries** for reactive reads. The frontend subscribes to queries, and Convex automatically pushes updates via WebSocket when underlying data changes.
 - **`ctx.scheduler.runAfter(0, ...)`** — This is the key pattern for non-blocking AI processing. The mutation writes "pending" items instantly (UI updates immediately), then background Actions process each item with AI asynchronously.
@@ -47,7 +47,7 @@ A real-time release dashboard that syncs GitHub PRs with Linear tickets, generat
 
 - **Frontend**: Nuxt 3 (Vue 3 Composition API + TypeScript)
 - **Backend**: Convex (database + serverless functions)
-- **AI**: Anthropic Claude (via direct API calls from Convex Actions)
+- **AI**: Google Gemini 2.5 Flash (via direct API calls from Convex Actions)
 - **APIs**: Linear SDK, Octokit (GitHub), Slack Incoming Webhooks
 - **Styling**: Tailwind CSS
 
@@ -66,7 +66,7 @@ npx convex env set GITHUB_OWNER "your-username"
 npx convex env set GITHUB_REPO "your-repo"
 npx convex env set LINEAR_API_KEY "lin_api_..."
 npx convex env set LINEAR_TEAM_KEY "ENG"
-npx convex env set ANTHROPIC_API_KEY "sk-ant-..."
+npx convex env set GEMINI_API_KEY "AIza..."
 npx convex env set SLACK_WEBHOOK_URL "https://hooks.slack.com/..."
 
 # Start the dev server (in a separate terminal)
