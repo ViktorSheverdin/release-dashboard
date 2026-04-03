@@ -11,6 +11,7 @@
 import type * as analyze from "../analyze.js";
 import type * as lib_aiProvider from "../lib/aiProvider.js";
 import type * as lib_prompts from "../lib/prompts.js";
+import type * as reassign from "../reassign.js";
 import type * as releases from "../releases.js";
 import type * as slack from "../slack.js";
 import type * as syncActions from "../syncActions.js";
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   analyze: typeof analyze;
   "lib/aiProvider": typeof lib_aiProvider;
   "lib/prompts": typeof lib_prompts;
+  reassign: typeof reassign;
   releases: typeof releases;
   slack: typeof slack;
   syncActions: typeof syncActions;

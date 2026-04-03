@@ -4,13 +4,16 @@ import type { Id } from '../../../convex/_generated/dataModel'
 
 const route = useRoute()
 const releaseId = route.params.id as Id<'releases'>
+const teamFilter = computed(() => route.query.team as string | undefined)
 
 const { data: release } = useConvexQuery(api.releases.get, { id: releaseId })
 const { data: items } = useConvexQuery(api.releases.getItems, { releaseId })
 const { execute: sendToSlack } = useConvexAction(api.slack.sendToSlack)
 const { execute: sendReleaseToSlack } = useConvexAction(api.slack.sendReleaseToSlack)
+const { execute: reassignTicket } = useConvexAction(api.reassign.reassignTicket)
 
 const sendingSlack = ref<Record<string, boolean>>({})
+const reassigning = ref<Record<string, boolean>>({})
 const sendingAll = ref(false)
 
 async function handleSendToSlack(itemId: string) {
@@ -21,6 +24,18 @@ async function handleSendToSlack(itemId: string) {
     console.error('Slack send failed:', e)
   } finally {
     sendingSlack.value[itemId] = false
+  }
+}
+
+async function handleReassign(itemId: string, ticketId: string) {
+  reassigning.value[itemId] = true
+  try {
+    await reassignTicket({ itemId: itemId as Id<'syncItems'>, ticketId })
+  } catch (e) {
+    console.error('Reassign failed:', e)
+    alert(`Failed to reassign ticket: ${(e as Error).message}`)
+  } finally {
+    reassigning.value[itemId] = false
   }
 }
 
@@ -35,10 +50,23 @@ async function handleSendAll() {
   }
 }
 
+// Filter items by team query param
+const filteredItems = computed(() => {
+  if (!items.value) return []
+  const filter = teamFilter.value
+  if (!filter) return items.value
+
+  return items.value.filter((item) => {
+    const teamKey = item.linearTeamKey ?? item.linearTicketId?.match(/^([A-Z]+)-/)?.[1]
+    if (filter === '__global__') return !teamKey
+    return teamKey === filter
+  })
+})
+
 const analyzedCount = computed(() =>
-  items.value?.filter((i) => i.status === 'analyzed').length ?? 0
+  filteredItems.value.filter((i) => i.status === 'analyzed').length
 )
-const totalCount = computed(() => items.value?.length ?? 0)
+const totalCount = computed(() => filteredItems.value.length)
 
 // Derive group status from item statuses
 function getGroupStatus(groupItems: typeof items.value): string {
@@ -52,14 +80,13 @@ function getGroupStatus(groupItems: typeof items.value): string {
   return 'Pending'
 }
 
-// Group items by team tag — PRs without a team go under "Global Changes"
+// Group filtered items by team tag
 const groupedItems = computed(() => {
-  if (!items.value) return []
+  if (!filteredItems.value.length) return []
 
   const groups = new Map<string, { label: string; status: string; items: typeof items.value }>()
 
-  for (const item of items.value) {
-    // Determine team key: prefer stored field, fall back to extracting from ticket ID
+  for (const item of filteredItems.value) {
     const teamKey = item.linearTeamKey ?? item.linearTicketId?.match(/^([A-Z]+)-/)?.[1]
     const teamName = item.linearTeamName
 
@@ -111,7 +138,7 @@ const groupedItems = computed(() => {
       <div class="flex items-center justify-between mb-6">
         <div>
           <h2 class="text-2xl font-bold flex items-center gap-3">
-            Release Report
+            {{ groupedItems.length === 1 ? groupedItems[0].label : 'Release Report' }}
             <StatusBadge :status="release.status" />
           </h2>
           <p class="text-gray-400 mt-1">
@@ -168,7 +195,9 @@ const groupedItems = computed(() => {
               :key="item._id"
               :item="item"
               :sending="sendingSlack[item._id] ?? false"
+              :reassigning="reassigning[item._id] ?? false"
               @send-slack="handleSendToSlack(item._id)"
+              @reassign="handleReassign(item._id, $event)"
             />
           </div>
         </div>

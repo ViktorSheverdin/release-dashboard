@@ -18,13 +18,30 @@ defineProps<{
     slackSent: boolean
   }
   sending: boolean
+  reassigning: boolean
 }>()
 
 defineEmits<{
   sendSlack: []
+  reassign: [ticketId: string]
 }>()
 
 const showTechnical = ref(false)
+const editing = ref(false)
+const ticketInput = ref('')
+const reassignError = ref('')
+
+function startEdit(currentTicketId?: string) {
+  ticketInput.value = currentTicketId ?? ''
+  reassignError.value = ''
+  editing.value = true
+}
+
+function cancelEdit() {
+  editing.value = false
+  ticketInput.value = ''
+  reassignError.value = ''
+}
 </script>
 
 <template>
@@ -62,19 +79,54 @@ const showTechnical = ref(false)
         </button>
       </div>
 
-      <!-- Linear ticket link -->
-      <div v-if="item.linearTicketId" class="mt-3 flex items-center gap-2 text-sm">
-        <span class="px-2 py-0.5 bg-violet-900/50 text-violet-300 rounded text-xs font-mono">
-          {{ item.linearTicketId }}
-        </span>
-        <a
-          v-if="item.linearUrl"
-          :href="item.linearUrl"
-          target="_blank"
-          class="text-gray-400 hover:text-violet-300 transition-colors"
-        >
-          {{ item.linearTitle }}
-        </a>
+      <!-- Linear ticket link + edit -->
+      <div class="mt-3 flex items-center gap-2 text-sm">
+        <template v-if="!editing">
+          <template v-if="item.linearTicketId">
+            <span class="px-2 py-0.5 bg-violet-900/50 text-violet-300 rounded text-xs font-mono">
+              {{ item.linearTicketId }}
+            </span>
+            <a
+              v-if="item.linearUrl"
+              :href="item.linearUrl"
+              target="_blank"
+              class="text-gray-400 hover:text-violet-300 transition-colors"
+            >
+              {{ item.linearTitle }}
+            </a>
+          </template>
+          <span v-else class="text-gray-600 text-xs">No ticket linked</span>
+          <button
+            @click="startEdit(item.linearTicketId)"
+            :disabled="reassigning"
+            class="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-700 hover:border-gray-600 rounded transition-colors"
+          >
+            {{ reassigning ? 'Updating...' : item.linearTicketId ? 'Change' : 'Link ticket' }}
+          </button>
+        </template>
+
+        <!-- Edit mode -->
+        <template v-else>
+          <input
+            v-model="ticketInput"
+            placeholder="e.g. ARD-17 (empty to clear)"
+            class="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-gray-200 w-48 focus:outline-none focus:border-indigo-500"
+            @keyup.enter="editing = false; $emit('reassign', ticketInput)"
+            @keyup.escape="cancelEdit"
+          />
+          <button
+            @click="editing = false; $emit('reassign', ticketInput)"
+            class="px-2 py-0.5 text-xs bg-indigo-600 hover:bg-indigo-500 rounded transition-colors"
+          >
+            Save
+          </button>
+          <button
+            @click="cancelEdit"
+            class="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+        </template>
       </div>
     </div>
 
