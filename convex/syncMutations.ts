@@ -1,4 +1,4 @@
-import { internalMutation, internalQuery } from "./_generated/server";
+import { internalMutation, internalQuery, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -100,6 +100,31 @@ export const createRelease = internalMutation({
       }
     }
     return releaseId;
+  },
+});
+
+// ── Mutation: update ticket reference on a sync item ────────────────────────
+export const updateTicketReference = internalMutation({
+  args: {
+    itemId: v.id("syncItems"),
+    linearTicketId: v.optional(v.string()),
+    linearTitle: v.optional(v.string()),
+    linearDescription: v.optional(v.string()),
+    linearUrl: v.optional(v.string()),
+    linearTeamKey: v.optional(v.string()),
+    linearTeamName: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { itemId, ...ticketFields } = args;
+    await ctx.db.patch(itemId, {
+      ...ticketFields,
+      status: "pending",
+      technicalSummary: undefined,
+      businessSummary: undefined,
+      keyChanges: undefined,
+      impactedAreas: undefined,
+      slackSent: false,
+    });
   },
 });
 

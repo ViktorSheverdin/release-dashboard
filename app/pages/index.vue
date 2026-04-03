@@ -68,7 +68,7 @@ async function handleSync() {
         <NuxtLink
           v-for="group in release.groups"
           :key="group.teamKey"
-          :to="`/releases/${release._id}`"
+          :to="`/releases/${release._id}?team=${group.teamKey}`"
           class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
         >
           <div class="flex items-center justify-between">
@@ -105,7 +105,7 @@ async function handleSync() {
         <!-- Global Changes as its own card -->
         <NuxtLink
           v-if="release.globalGroup"
-          :to="`/releases/${release._id}`"
+          :to="`/releases/${release._id}?team=__global__`"
           class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
         >
           <div class="flex items-center justify-between">
