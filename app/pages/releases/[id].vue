@@ -16,7 +16,11 @@ const sendingSlack = ref<Record<string, boolean>>({})
 const reassigning = ref<Record<string, boolean>>({})
 const sendingAll = ref(false)
 
+const slackCooldown = ref<Record<string, boolean>>({})
+const sendAllCooldown = ref(false)
+
 async function handleSendToSlack(itemId: string) {
+  if (slackCooldown.value[itemId]) return
   sendingSlack.value[itemId] = true
   try {
     await sendToSlack({ itemId: itemId as Id<'syncItems'> })
@@ -24,6 +28,8 @@ async function handleSendToSlack(itemId: string) {
     console.error('Slack send failed:', e)
   } finally {
     sendingSlack.value[itemId] = false
+    slackCooldown.value[itemId] = true
+    setTimeout(() => { slackCooldown.value[itemId] = false }, 3000)
   }
 }
 
@@ -40,6 +46,7 @@ async function handleReassign(itemId: string, ticketId: string) {
 }
 
 async function handleSendAll() {
+  if (sendAllCooldown.value) return
   sendingAll.value = true
   try {
     await sendReleaseToSlack({ releaseId })
@@ -47,6 +54,8 @@ async function handleSendAll() {
     console.error('Slack send failed:', e)
   } finally {
     sendingAll.value = false
+    sendAllCooldown.value = true
+    setTimeout(() => { sendAllCooldown.value = false }, 3000)
   }
 }
 
@@ -149,10 +158,10 @@ const groupedItems = computed(() => {
         <button
           v-if="analyzedCount > 0"
           @click="handleSendAll"
-          :disabled="sendingAll"
+          :disabled="sendingAll || sendAllCooldown"
           class="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:bg-green-900 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
         >
-          {{ sendingAll ? 'Sending...' : `Send All to Slack (${analyzedCount})` }}
+          {{ sendingAll ? 'Sending...' : sendAllCooldown ? 'Sent' : `Send All to Slack (${analyzedCount})` }}
         </button>
       </div>
 
@@ -195,6 +204,7 @@ const groupedItems = computed(() => {
               :key="item._id"
               :item="item"
               :sending="sendingSlack[item._id] ?? false"
+              :slack-cooldown="slackCooldown[item._id] ?? false"
               :reassigning="reassigning[item._id] ?? false"
               @send-slack="handleSendToSlack(item._id)"
               @reassign="handleReassign(item._id, $event)"

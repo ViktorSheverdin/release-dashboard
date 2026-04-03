@@ -18,6 +18,7 @@ defineProps<{
     slackSent: boolean
   }
   sending: boolean
+  slackCooldown: boolean
   reassigning: boolean
 }>()
 
@@ -70,12 +71,12 @@ function cancelEdit() {
           </div>
         </div>
         <button
-          v-if="item.status === 'analyzed' && !item.slackSent"
+          v-if="item.status === 'analyzed'"
           @click="$emit('sendSlack')"
-          :disabled="sending"
+          :disabled="sending || slackCooldown"
           class="ml-4 px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-green-900 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
         >
-          {{ sending ? 'Sending...' : 'Send to Slack' }}
+          {{ sending ? 'Sending...' : slackCooldown ? 'Sent' : item.slackSent ? 'Resend to Slack' : 'Send to Slack' }}
         </button>
       </div>
 
