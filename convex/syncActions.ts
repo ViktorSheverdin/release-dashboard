@@ -117,6 +117,8 @@ export const triggerSync = action({
         linearTitle: matchedTicket?.title,
         linearDescription: matchedTicket?.description,
         linearUrl: matchedTicket?.url,
+        linearTeamKey: matchedTicket ? linearTeamKey : undefined,
+        linearTeamName: matchedTicket && team ? team.name : undefined,
       };
     });
 

@@ -40,32 +40,53 @@ const analyzedCount = computed(() =>
 )
 const totalCount = computed(() => items.value?.length ?? 0)
 
-// Group items: by Linear ticket, unmatched go under "Global Changes"
+// Derive group status from item statuses
+function getGroupStatus(groupItems: typeof items.value): string {
+  if (!groupItems || groupItems.length === 0) return 'Pending'
+  const allAnalyzed = groupItems.every((i) => i.status === 'analyzed')
+  if (allAnalyzed) return 'Completed'
+  const hasError = groupItems.some((i) => i.status === 'error')
+  if (hasError) return 'Error'
+  const hasAnalyzing = groupItems.some((i) => i.status === 'analyzing')
+  if (hasAnalyzing) return 'Analyzing'
+  return 'Pending'
+}
+
+// Group items by team tag — PRs without a team go under "Global Changes"
 const groupedItems = computed(() => {
   if (!items.value) return []
 
-  const groups = new Map<string, { label: string; ticketUrl?: string; items: typeof items.value }>()
+  const groups = new Map<string, { label: string; status: string; items: typeof items.value }>()
 
   for (const item of items.value) {
-    if (item.linearTicketId) {
-      const key = item.linearTicketId
-      if (!groups.has(key)) {
-        groups.set(key, {
-          label: `${item.linearTicketId} — ${item.linearTitle ?? 'Unknown'}`,
-          ticketUrl: item.linearUrl,
+    // Determine team key: prefer stored field, fall back to extracting from ticket ID
+    const teamKey = item.linearTeamKey ?? item.linearTicketId?.match(/^([A-Z]+)-/)?.[1]
+    const teamName = item.linearTeamName
+
+    if (teamKey) {
+      if (!groups.has(teamKey)) {
+        const displayName = teamName ? `${teamName} (${teamKey})` : teamKey
+        groups.set(teamKey, {
+          label: displayName,
+          status: '',
           items: [],
         })
       }
-      groups.get(key)!.items.push(item)
+      groups.get(teamKey)!.items.push(item)
     } else {
       if (!groups.has('__global__')) {
-        groups.set('__global__', { label: 'Global Changes', items: [] })
+        groups.set('__global__', { label: 'Global Changes', status: '', items: [] })
       }
       groups.get('__global__')!.items.push(item)
     }
   }
 
-  // Put matched tickets first, Global Changes last
+  // Compute status for each group
+  for (const group of groups.values()) {
+    group.status = getGroupStatus(group.items)
+  }
+
+  // Team groups first, Global Changes last
   const sorted = [...groups.entries()].sort((a, b) => {
     if (a[0] === '__global__') return 1
     if (b[0] === '__global__') return -1
@@ -120,16 +141,19 @@ const groupedItems = computed(() => {
         <div v-for="group in groupedItems" :key="group.label">
           <!-- Group header -->
           <div class="mb-3">
-            <h3 class="text-lg font-semibold">
-              <a
-                v-if="group.ticketUrl"
-                :href="group.ticketUrl"
-                target="_blank"
-                class="text-violet-400 hover:text-violet-300 transition-colors"
+            <h3 class="text-lg font-semibold flex items-center gap-2">
+              <span
+                class="text-xs font-medium px-2 py-0.5 rounded-full"
+                :class="{
+                  'bg-green-900/50 text-green-400': group.status === 'Completed',
+                  'bg-yellow-900/50 text-yellow-400': group.status === 'Analyzing',
+                  'bg-gray-700 text-gray-400': group.status === 'Pending',
+                  'bg-red-900/50 text-red-400': group.status === 'Error',
+                }"
               >
-                {{ group.label }}
-              </a>
-              <span v-else class="text-gray-300">{{ group.label }}</span>
+                {{ group.status }}
+              </span>
+              <span class="text-gray-300">{{ group.label }}</span>
               <span class="text-gray-500 font-normal">
                 ({{ group.items.length }} PR{{ group.items.length !== 1 ? 's' : '' }} synced)
               </span>

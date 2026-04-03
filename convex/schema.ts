@@ -27,6 +27,9 @@ export default defineSchema({
     linearTitle: v.optional(v.string()),
     linearDescription: v.optional(v.string()),
     linearUrl: v.optional(v.string()),
+    // Linear team data (for grouping by team)
+    linearTeamKey: v.optional(v.string()),
+    linearTeamName: v.optional(v.string()),
     // AI-generated summaries — structured, queryable fields
     status: v.union(
       v.literal("pending"),
