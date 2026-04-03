@@ -54,16 +54,19 @@ export const addToRelease = internalMutation({
     }
 
     for (const item of args.items) {
+      const hasTicket = !!item.linearTicketId;
       const itemId = await ctx.db.insert("syncItems", {
         releaseId,
         ...item,
-        status: "pending",
+        status: hasTicket ? "pending" : "analyzed",
         slackSent: false,
       });
 
-      await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
-        itemId,
-      });
+      if (hasTicket) {
+        await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
+          itemId,
+        });
+      }
     }
 
     return releaseId;
@@ -83,15 +86,18 @@ export const createRelease = internalMutation({
     });
 
     for (const item of args.items) {
+      const hasTicket = !!item.linearTicketId;
       const itemId = await ctx.db.insert("syncItems", {
         releaseId,
         ...item,
-        status: "pending",
+        status: hasTicket ? "pending" : "analyzed",
         slackSent: false,
       });
-      await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
-        itemId,
-      });
+      if (hasTicket) {
+        await ctx.scheduler.runAfter(0, internal.analyze.analyzeItem, {
+          itemId,
+        });
+      }
     }
     return releaseId;
   },
