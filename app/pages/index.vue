@@ -62,17 +62,17 @@ async function handleSync() {
     </div>
 
     <!-- Release list -->
-    <div v-else class="space-y-4">
-      <NuxtLink
-        v-for="release in releases"
-        :key="release._id"
-        :to="`/releases/${release._id}`"
-        class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
-      >
-        <div class="flex items-center justify-between">
-          <div class="space-y-1.5">
-            <!-- Team groups -->
-            <div v-for="group in release.groups" :key="group.teamKey" class="flex items-center gap-2">
+    <template v-else v-for="release in releases" :key="release._id">
+      <!-- Team group cards -->
+      <div class="space-y-4 mb-4">
+        <NuxtLink
+          v-for="group in release.groups"
+          :key="group.teamKey"
+          :to="`/releases/${release._id}`"
+          class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
               <span
                 class="text-xs font-medium px-2 py-0.5 rounded-full"
                 :class="{
@@ -84,30 +84,53 @@ async function handleSync() {
               >
                 {{ group.status }}
               </span>
-              <span class="font-medium">{{ group.teamName }} ({{ group.teamKey }})</span>
-              <span class="text-gray-500 text-sm">
-                ({{ group.count }} PR{{ group.count !== 1 ? 's' : '' }} synced)
-              </span>
+              <div>
+                <div class="font-medium">
+                  {{ group.teamName }} ({{ group.teamKey }})
+                  <span class="text-gray-500 font-normal">
+                    ({{ group.count }} PR{{ group.count !== 1 ? 's' : '' }} synced)
+                  </span>
+                </div>
+                <div class="text-sm text-gray-500 mt-0.5">
+                  {{ new Date(release.syncedAt).toLocaleString() }}
+                </div>
+              </div>
             </div>
-            <!-- Global changes -->
-            <div v-if="release.globalCount > 0" class="flex items-center gap-2">
-              <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
-                Global
-              </span>
-              <span class="font-medium text-gray-300">Global Changes</span>
-              <span class="text-gray-500 text-sm">
-                ({{ release.globalCount }} PR{{ release.globalCount !== 1 ? 's' : '' }} synced)
-              </span>
-            </div>
-            <div class="text-sm text-gray-500 mt-0.5">
-              {{ new Date(release.syncedAt).toLocaleString() }}
-            </div>
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
           </div>
-          <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-      </NuxtLink>
-    </div>
+        </NuxtLink>
+
+        <!-- Global Changes as its own card -->
+        <NuxtLink
+          v-if="release.globalGroup"
+          :to="`/releases/${release._id}`"
+          class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
+        >
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
+                {{ release.globalGroup.status }}
+              </span>
+              <div>
+                <div class="font-medium text-gray-300">
+                  Global Changes
+                  <span class="text-gray-500 font-normal">
+                    ({{ release.globalGroup.count }} PR{{ release.globalGroup.count !== 1 ? 's' : '' }} synced)
+                  </span>
+                </div>
+                <div class="text-sm text-gray-500 mt-0.5">
+                  {{ new Date(release.syncedAt).toLocaleString() }}
+                </div>
+              </div>
+            </div>
+            <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </div>
+        </NuxtLink>
+      </div>
+    </template>
   </div>
 </template>

@@ -1,6 +1,15 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
+function computeStatus(items: { status: string }[]): string {
+  if (items.length === 0) return "Pending";
+  const allAnalyzed = items.every((i) => i.status === "analyzed");
+  if (allAnalyzed) return "Completed";
+  if (items.some((i) => i.status === "error")) return "Error";
+  if (items.some((i) => i.status === "analyzing")) return "Analyzing";
+  return "Pending";
+}
+
 export const list = query({
   args: {},
   handler: async (ctx) => {
@@ -13,11 +22,8 @@ export const list = query({
           .withIndex("by_releaseId", (q) => q.eq("releaseId", release._id))
           .collect();
 
-        const teamGroups = new Map<
-          string,
-          { teamKey: string; teamName: string; count: number; allAnalyzed: boolean; hasError: boolean; hasAnalyzing: boolean }
-        >();
-        let globalCount = 0;
+        const teamItemsMap = new Map<string, typeof items>();
+        const globalItems: typeof items = [];
 
         for (const item of items) {
           const teamKey =
@@ -25,41 +31,32 @@ export const list = query({
             item.linearTicketId?.match(/^([A-Z]+)-/)?.[1];
 
           if (teamKey) {
-            const existing = teamGroups.get(teamKey);
-            if (existing) {
-              existing.count++;
-              if (item.status !== "analyzed") existing.allAnalyzed = false;
-              if (item.status === "error") existing.hasError = true;
-              if (item.status === "analyzing") existing.hasAnalyzing = true;
-            } else {
-              teamGroups.set(teamKey, {
-                teamKey,
-                teamName: item.linearTeamName ?? teamKey,
-                count: 1,
-                allAnalyzed: item.status === "analyzed",
-                hasError: item.status === "error",
-                hasAnalyzing: item.status === "analyzing",
-              });
+            if (!teamItemsMap.has(teamKey)) {
+              teamItemsMap.set(teamKey, []);
             }
+            teamItemsMap.get(teamKey)!.push(item);
           } else {
-            globalCount++;
+            globalItems.push(item);
           }
         }
 
-        const groups = [...teamGroups.values()].map((g) => ({
-          teamKey: g.teamKey,
-          teamName: g.teamName,
-          count: g.count,
-          status: g.allAnalyzed
-            ? "Completed"
-            : g.hasError
-              ? "Error"
-              : g.hasAnalyzing
-                ? "Analyzing"
-                : "Pending",
+        const groups = [...teamItemsMap.entries()].map(([teamKey, teamItems]) => ({
+          teamKey,
+          teamName: teamItems[0].linearTeamName ?? teamKey,
+          count: teamItems.length,
+          status: computeStatus(teamItems),
         }));
 
-        return { ...release, groups, globalCount };
+        const globalGroup = globalItems.length > 0
+          ? {
+              teamKey: "__global__",
+              teamName: "Global Changes",
+              count: globalItems.length,
+              status: computeStatus(globalItems),
+            }
+          : null;
+
+        return { ...release, groups, globalGroup };
       })
     );
   },

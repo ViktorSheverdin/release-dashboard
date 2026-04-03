@@ -6,17 +6,19 @@ import { Octokit } from "octokit";
 import { LinearClient } from "@linear/sdk";
 
 // ── Ticket ID extraction ────────────────────────────────────────────────────
-function extractTicketIds(text: string, teamPrefix: string): string[] {
+// Searches text for ticket IDs matching any of the given team prefixes
+function extractTicketIds(text: string, teamPrefixes: string[]): string[] {
   const ids: string[] = [];
+  const prefixPattern = teamPrefixes.join("|");
 
-  // Match direct ticket IDs (e.g., ARD-123)
-  const directRegex = new RegExp(`(${teamPrefix}-\\d+)`, "gi");
+  // Match direct ticket IDs (e.g., ARD-123, OPS-5)
+  const directRegex = new RegExp(`((?:${prefixPattern})-\\d+)`, "gi");
   const directMatches = text.match(directRegex);
   if (directMatches) ids.push(...directMatches);
 
   // Match Linear URLs containing ticket IDs
   const urlRegex = new RegExp(
-    `linear\\.app/[^/]+/issue/(${teamPrefix}-\\d+)`,
+    `linear\\.app/[^/]+/issue/((?:${prefixPattern})-\\d+)`,
     "gi"
   );
   let urlMatch;
@@ -35,7 +37,6 @@ export const triggerSync = action({
     const linearApiKey = process.env.LINEAR_API_KEY!;
     const owner = process.env.GITHUB_OWNER!;
     const repo = process.env.GITHUB_REPO!;
-    const linearTeamKey = process.env.LINEAR_TEAM_KEY!; // e.g. "ARD"
 
     // 1. Fetch merged PRs from GitHub
     const octokit = new Octokit({ auth: githubToken });
@@ -61,20 +62,26 @@ export const triggerSync = action({
       return "no_new_prs";
     }
 
-    // 3. Fetch Linear tickets — find team by key prefix, not UUID
+    // 3. Fetch ALL Linear teams and their recent tickets
     const linear = new LinearClient({ apiKey: linearApiKey });
     const { nodes: teams } = await linear.teams();
-    const team = teams.find((t) => t.key === linearTeamKey);
 
-    const ticketMap = new Map<
+    // Map of team key -> team info
+    const teamInfoMap = new Map<
       string,
-      { id: string; title: string; description?: string; url: string }
+      { key: string; name: string }
     >();
 
-    if (team) {
-      const { nodes: issues } = await team.issues({
-        first: 100,
-      });
+    // Map of ticket identifier -> ticket data
+    const ticketMap = new Map<
+      string,
+      { id: string; title: string; description?: string; url: string; teamKey: string; teamName: string }
+    >();
+
+    for (const team of teams) {
+      teamInfoMap.set(team.key, { key: team.key, name: team.name });
+
+      const { nodes: issues } = await team.issues({ first: 10 });
 
       for (const issue of issues) {
         ticketMap.set(issue.identifier, {
@@ -82,18 +89,20 @@ export const triggerSync = action({
           title: issue.title,
           description: issue.description ?? undefined,
           url: issue.url,
+          teamKey: team.key,
+          teamName: team.name,
         });
       }
-      console.log(`Found ${ticketMap.size} Linear tickets in team ${team.name} (${team.key})`);
-    } else {
-      console.warn(`No Linear team found with key "${linearTeamKey}". Available teams: ${teams.map(t => t.key).join(", ")}`);
+      console.log(`Found ${issues.length} Linear tickets in team ${team.name} (${team.key})`);
     }
 
-    // 4. Correlate PRs with Linear tickets
+    const teamPrefixes = [...teamInfoMap.keys()];
+
+    // 4. Correlate PRs with Linear tickets across all teams
     const items = newPrs.map((pr) => {
-      const branchTickets = extractTicketIds(pr.head?.ref ?? "", linearTeamKey);
-      const titleTickets = extractTicketIds(pr.title ?? "", linearTeamKey);
-      const bodyTickets = extractTicketIds(pr.body ?? "", linearTeamKey);
+      const branchTickets = extractTicketIds(pr.head?.ref ?? "", teamPrefixes);
+      const titleTickets = extractTicketIds(pr.title ?? "", teamPrefixes);
+      const bodyTickets = extractTicketIds(pr.body ?? "", teamPrefixes);
       const allTicketIds = [
         ...new Set([...branchTickets, ...titleTickets, ...bodyTickets]),
       ];
@@ -117,8 +126,8 @@ export const triggerSync = action({
         linearTitle: matchedTicket?.title,
         linearDescription: matchedTicket?.description,
         linearUrl: matchedTicket?.url,
-        linearTeamKey: matchedTicket ? linearTeamKey : undefined,
-        linearTeamName: matchedTicket && team ? team.name : undefined,
+        linearTeamKey: matchedTicket?.teamKey,
+        linearTeamName: matchedTicket?.teamName,
       };
     });
 
