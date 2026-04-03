@@ -13,6 +13,8 @@ const syncItemValidator = v.object({
   linearTitle: v.optional(v.string()),
   linearDescription: v.optional(v.string()),
   linearUrl: v.optional(v.string()),
+  linearTeamKey: v.optional(v.string()),
+  linearTeamName: v.optional(v.string()),
 });
 
 // ── Mutation: add items to the latest release, or create one ────────────────

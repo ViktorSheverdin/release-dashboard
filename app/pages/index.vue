@@ -70,18 +70,37 @@ async function handleSync() {
         class="block p-5 bg-gray-900 border border-gray-800 rounded-xl hover:border-gray-700 transition-colors"
       >
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <StatusBadge :status="release.status" />
-            <div>
-              <div class="font-medium">
-                {{ release.prCount }} PRs synced
-                <span class="text-gray-500 font-normal">
-                  ({{ release.matchedCount }} matched to Linear)
-                </span>
-              </div>
-              <div class="text-sm text-gray-500 mt-0.5">
-                {{ new Date(release.syncedAt).toLocaleString() }}
-              </div>
+          <div class="space-y-1.5">
+            <!-- Team groups -->
+            <div v-for="group in release.groups" :key="group.teamKey" class="flex items-center gap-2">
+              <span
+                class="text-xs font-medium px-2 py-0.5 rounded-full"
+                :class="{
+                  'bg-green-900/50 text-green-400': group.status === 'Completed',
+                  'bg-yellow-900/50 text-yellow-400': group.status === 'Analyzing',
+                  'bg-gray-700 text-gray-400': group.status === 'Pending',
+                  'bg-red-900/50 text-red-400': group.status === 'Error',
+                }"
+              >
+                {{ group.status }}
+              </span>
+              <span class="font-medium">{{ group.teamName }} ({{ group.teamKey }})</span>
+              <span class="text-gray-500 text-sm">
+                ({{ group.count }} PR{{ group.count !== 1 ? 's' : '' }} synced)
+              </span>
+            </div>
+            <!-- Global changes -->
+            <div v-if="release.globalCount > 0" class="flex items-center gap-2">
+              <span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-400">
+                Global
+              </span>
+              <span class="font-medium text-gray-300">Global Changes</span>
+              <span class="text-gray-500 text-sm">
+                ({{ release.globalCount }} PR{{ release.globalCount !== 1 ? 's' : '' }} synced)
+              </span>
+            </div>
+            <div class="text-sm text-gray-500 mt-0.5">
+              {{ new Date(release.syncedAt).toLocaleString() }}
             </div>
           </div>
           <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
