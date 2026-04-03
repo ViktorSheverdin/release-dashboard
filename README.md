@@ -1,90 +1,138 @@
 # Release Intelligence Dashboard
 
-A real-time release dashboard that syncs GitHub PRs with Linear tickets, generates AI-powered dual-format summaries (technical + business), and distributes them to Slack.
+Real-time release dashboard: syncs GitHub PRs with Linear tickets across all teams, generates AI summaries, distributes to Slack.
 
-The team prefix is ARD
+## File Structure
 
-## Architecture
+```
+convex/                        # Backend (Convex serverless)
+├── schema.ts                  # DB schema: releases, syncItems tables
+├── syncActions.ts             # Entry point: GitHub fetch + Linear correlation
+├── syncMutations.ts           # DB writes: create releases, update items, reassign tickets
+├── releases.ts                # Queries: list (with team groups), get, getItems
+├── reassign.ts                # Action: change ticket reference + re-trigger analysis
+├── analyze.ts                 # Action: orchestrates AI analysis per item
+├── slack.ts                   # Action: send to Slack (single + bulk)
+└── lib/
+    ├── aiProvider.ts           # Swappable AI provider interface (Gemini impl)
+    └── prompts.ts              # All LLM prompt templates (editable for fine-tuning)
 
-### Data Flow: Sync → AI Processing → Database Update
+app/                           # Frontend (Nuxt 3 + Vue 3)
+├── pages/
+│   ├── index.vue              # Dashboard: team group cards + global changes
+│   └── releases/[id].vue     # Detail: filtered by ?team= query param
+├── components/
+│   ├── TeamGroupCard.vue      # Clickable card per team on index
+│   ├── SyncItemCard.vue       # PR card with analysis, slack, ticket reassign
+│   ├── StatusBadge.vue        # Item status pill (syncing/analyzed/error)
+│   └── ui/                    # Reusable styled wrappers
+│       ├── CardShell.vue      # Dark rounded card container
+│       ├── GroupStatusBadge.vue # Team group status pill
+│       ├── ProgressBar.vue    # Analysis progress bar
+│       ├── PageHeader.vue     # Title + subtitle + action slot
+│       ├── ActionButton.vue   # Button variants: primary/success/ghost
+│       ├── BackLink.vue       # Back navigation
+│       ├── SpinnerIcon.vue    # Loading spinner
+│       └── ChevronRight.vue   # Arrow icon
+├── composables/
+│   └── useConvex.ts           # Reactive query/mutation/action hooks
+└── plugins/
+    └── convex.client.ts       # ConvexClient initialization
+```
+
+## Mutation Order (Sync Pipeline)
 
 ```
 1. triggerSync (Action)
-   ├── Fetches merged PRs from GitHub via Octokit
-   ├── Fetches tickets from Linear API
-   └── Correlates PRs ↔ tickets via regex on branch names + PR body
-          │
-2. createRelease (Mutation — transactional)
-   ├── Inserts Release record (status: "syncing")
-   ├── Inserts SyncItem records (status: "pending")
-   └── Schedules analyzeItem Action for each item
-          │
-3. analyzeItem (Internal Action — background, non-blocking)
-   ├── Calls Gemini API for technical summary
-   ├── Calls Gemini API for business summary
-   ├── Calls Gemini API for structured data (keyChanges, impactedAreas)
-   └── Calls updateItemAnalysis Mutation
-          │
+   ├── Fetch merged PRs from GitHub (Octokit)
+   ├── Dedup against existing syncItems
+   ├── Fetch ALL Linear teams + last 10 issues per team
+   ├── Extract ticket IDs from branch/title/body (regex, all team prefixes)
+   └── Match PRs to tickets across teams
+
+2. addToRelease (Mutation — transactional)
+   ├── Create or update release record (status: "syncing")
+   ├── Insert syncItems (matched → status: "pending", unmatched → "analyzed")
+   └── Schedule analyzeItem for matched items only
+
+3. analyzeItem (Internal Action — background, per item)
+   ├── Set status → "analyzing"
+   ├── Build context from PR + ticket data (lib/prompts.ts)
+   ├── Call AI provider 3x (lib/aiProvider.ts):
+   │   technical summary, business summary, structured JSON
+   └── Call updateItemAnalysis mutation
+
 4. updateItemAnalysis (Mutation)
-   ├── Patches SyncItem with AI results (status: "analyzed")
-   └── Checks if all items done → updates Release status to "synced"
+   ├── Patch item with AI results (status → "analyzed")
+   └── Check if all items done → release status → "synced"
 ```
 
-### Why these specific Convex functions?
+Key patterns:
+- **Actions** = external API calls (can't write DB directly)
+- **Mutations** = transactional DB writes (can schedule actions)
+- **`ctx.scheduler.runAfter(0, ...)`** = non-blocking: items appear instantly as "pending", AI runs in background
+- Unmatched PRs (Global Changes) skip AI analysis entirely
 
-- **Actions** for external API calls (GitHub, Linear, Gemini, Slack). Actions can make network requests but cannot write to the DB directly.
-- **Mutations** for all database writes. Mutations are transactional — all writes succeed or none do. They can also schedule Actions, which is how we chain the async pipeline.
-- **Queries** for reactive reads. The frontend subscribes to queries, and Convex automatically pushes updates via WebSocket when underlying data changes.
-- **`ctx.scheduler.runAfter(0, ...)`** — This is the key pattern for non-blocking AI processing. The mutation writes "pending" items instantly (UI updates immediately), then background Actions process each item with AI asynchronously.
+## Render Order (Frontend)
 
-### Why Convex over a traditional cron job?
+```
+index.vue
+├── PageHeader ("Release Dashboard" + Sync Now button)
+├── For each release:
+│   ├── TeamGroupCard per team (status + name + PR count)
+│   │   Links to /releases/[id]?team=ARD
+│   └── TeamGroupCard for Global Changes (if any)
+│       Links to /releases/[id]?team=__global__
 
-1. **Real-time reactivity**: When an AI analysis completes and the mutation updates the DB, every connected client sees the change instantly. No polling, no refresh buttons, no stale data.
-2. **Transactional guarantees**: Mutations are atomic. No race conditions when multiple items finish analyzing simultaneously.
-3. **Built-in scheduling**: `ctx.scheduler.runAfter()` replaces the need for separate job queue infrastructure (Redis, Bull, SQS). The scheduler is integrated with the database — scheduled jobs reference DB records by ID with type safety.
-4. **Type-safe end-to-end**: Schema → backend functions → generated API → frontend composables, all TypeScript with auto-completion.
-5. **No infrastructure management**: No servers, no connection pooling, no deployment pipelines. `npx convex dev` syncs functions to the cloud.
+releases/[id].vue (filtered by ?team= query param)
+├── BackLink → /
+├── PageHeader (team name or "Release Report" + Send All button)
+├── ProgressBar (analyzed / total)
+└── For each group (usually 1 when filtered):
+    ├── GroupStatusBadge + label + PR count
+    └── SyncItemCard per PR:
+        ├── StatusBadge + PR link + author + merge date
+        ├── Ticket reference (editable: Change / Link ticket)
+        ├── Business summary (always visible)
+        ├── Technical details (collapsible)
+        │   ├── Technical summary
+        │   ├── Key changes (bullets)
+        │   └── Impacted areas (tags)
+        └── Send to Slack button (3s cooldown)
+```
+
+Reactivity: Convex queries auto-update via WebSocket. When AI analysis completes on the backend, the item status and summaries appear on all connected clients instantly.
+
+## Ticket Reassignment Flow
+
+```
+User clicks "Change" on SyncItemCard
+→ Types new ticket ID (e.g., OPS-5)
+→ reassignTicket (Action):
+   ├── Look up ticket in Linear API
+   ├── Update syncItem (new ticket + team info, clear old analysis)
+   └── Re-trigger analyzeItem
+→ Item moves to correct team group, new AI summary generated
+```
 
 ## Tech Stack
 
 - **Frontend**: Nuxt 3 (Vue 3 Composition API + TypeScript)
 - **Backend**: Convex (database + serverless functions)
-- **AI**: Google Gemini 2.5 Flash (via direct API calls from Convex Actions)
+- **AI**: Google Gemini 2.5 Flash (swappable via `lib/aiProvider.ts`)
 - **APIs**: Linear SDK, Octokit (GitHub), Slack Incoming Webhooks
 - **Styling**: Tailwind CSS
 
 ## Setup
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Start Convex (authenticates via GitHub, creates project)
-npx convex dev
-
-# Set environment variables in Convex
-npx convex env set GITHUB_TOKEN "ghp_..."
-npx convex env set GITHUB_OWNER "your-username"
-npx convex env set GITHUB_REPO "your-repo"
-npx convex env set LINEAR_API_KEY "lin_api_..."
-npx convex env set LINEAR_TEAM_KEY "ENG"
-npx convex env set GEMINI_API_KEY "AIza..."
-npx convex env set SLACK_WEBHOOK_URL "https://hooks.slack.com/..."
-
-# Start the dev server (in a separate terminal)
-pnpm dev
+npx convex dev          # Backend (authenticates + syncs functions)
+pnpm dev                # Frontend (http://localhost:3000)
 ```
 
-## Development
-
-Run both Convex and Nuxt in separate terminals:
-
-```bash
-# Terminal 1: Convex backend
-npx convex dev
-
-# Terminal 2: Nuxt frontend
-pnpm dev
-```
-
-Visit `http://localhost:3000`, click "Sync Now", and watch the real-time pipeline in action.
+Environment variables (set via `npx convex env set`):
+- `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`
+- `LINEAR_API_KEY`
+- `GEMINI_API_KEY`
+- `SLACK_WEBHOOK_URL`

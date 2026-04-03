@@ -136,41 +136,31 @@ const groupedItems = computed(() => {
 
 <template>
   <div>
-    <NuxtLink to="/" class="text-sm text-indigo-400 hover:text-indigo-300 mb-6 inline-flex items-center gap-1">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-      Back to Dashboard
-    </NuxtLink>
+    <UiBackLink to="/" label="Back to Dashboard" />
 
     <div v-if="release" class="mt-4">
-      <div class="flex items-center justify-between mb-6">
-        <div>
-          <h2 class="text-2xl font-bold flex items-center gap-3">
-            {{ groupedItems.length === 1 ? groupedItems[0].label : 'Release Report' }}
-            <StatusBadge :status="release.status" />
-          </h2>
-          <p class="text-gray-400 mt-1">
-            {{ new Date(release.syncedAt).toLocaleString() }}
-            &middot; {{ analyzedCount }}/{{ totalCount }} analyzed
-          </p>
-        </div>
-        <button
-          v-if="analyzedCount > 0"
-          @click="handleSendAll"
-          :disabled="sendingAll || sendAllCooldown"
-          class="px-4 py-2 bg-green-700 hover:bg-green-600 disabled:bg-green-900 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-        >
-          {{ sendingAll ? 'Sending...' : sendAllCooldown ? 'Sent' : `Send All to Slack (${analyzedCount})` }}
-        </button>
-      </div>
+      <UiPageHeader
+        :title="groupedItems.length === 1 ? groupedItems[0].label : 'Release Report'"
+        :subtitle="`${new Date(release.syncedAt).toLocaleString()} · ${analyzedCount}/${totalCount} analyzed`"
+      >
+        <template #badge>
+          <StatusBadge :status="release.status" />
+        </template>
+        <template #action>
+          <UiActionButton
+            v-if="analyzedCount > 0"
+            variant="success"
+            :disabled="sendingAll || sendAllCooldown"
+            @click="handleSendAll"
+          >
+            {{ sendingAll ? 'Sending...' : sendAllCooldown ? 'Sent' : `Send All to Slack (${analyzedCount})` }}
+          </UiActionButton>
+        </template>
+      </UiPageHeader>
 
       <!-- Progress bar -->
-      <div class="mb-8 bg-gray-800 rounded-full h-2 overflow-hidden">
-        <div
-          class="h-full bg-indigo-500 transition-all duration-500 ease-out"
-          :style="{ width: totalCount > 0 ? `${(analyzedCount / totalCount) * 100}%` : '0%' }"
-        />
+      <div class="mb-8">
+        <UiProgressBar :current="analyzedCount" :total="totalCount" />
       </div>
 
       <!-- Grouped items -->
@@ -179,17 +169,7 @@ const groupedItems = computed(() => {
           <!-- Group header -->
           <div class="mb-3">
             <h3 class="text-lg font-semibold flex items-center gap-2">
-              <span
-                class="text-xs font-medium px-2 py-0.5 rounded-full"
-                :class="{
-                  'bg-green-900/50 text-green-400': group.status === 'Completed',
-                  'bg-yellow-900/50 text-yellow-400': group.status === 'Analyzing',
-                  'bg-gray-700 text-gray-400': group.status === 'Pending',
-                  'bg-red-900/50 text-red-400': group.status === 'Error',
-                }"
-              >
-                {{ group.status }}
-              </span>
+              <UiGroupStatusBadge :status="group.status" />
               <span class="text-gray-300">{{ group.label }}</span>
               <span class="text-gray-500 font-normal">
                 ({{ group.items.length }} PR{{ group.items.length !== 1 ? 's' : '' }} synced)
