@@ -30,23 +30,20 @@ defineEmits<{
 const showTechnical = ref(false)
 const editing = ref(false)
 const ticketInput = ref('')
-const reassignError = ref('')
 
 function startEdit(currentTicketId?: string) {
   ticketInput.value = currentTicketId ?? ''
-  reassignError.value = ''
   editing.value = true
 }
 
 function cancelEdit() {
   editing.value = false
   ticketInput.value = ''
-  reassignError.value = ''
 }
 </script>
 
 <template>
-  <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+  <UiCardShell>
     <!-- Header -->
     <div class="p-5">
       <div class="flex items-start justify-between">
@@ -70,14 +67,15 @@ function cancelEdit() {
             <span>merged {{ new Date(item.prMergedAt).toLocaleDateString() }}</span>
           </div>
         </div>
-        <button
+        <UiActionButton
           v-if="item.status === 'analyzed'"
-          @click="$emit('sendSlack')"
+          variant="success"
+          size="sm"
           :disabled="sending || slackCooldown"
-          class="ml-4 px-3 py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-green-900 rounded-lg text-xs font-medium transition-colors whitespace-nowrap"
+          @click="$emit('sendSlack')"
         >
           {{ sending ? 'Sending...' : slackCooldown ? 'Sent' : item.slackSent ? 'Resend to Slack' : 'Send to Slack' }}
-        </button>
+        </UiActionButton>
       </div>
 
       <!-- Linear ticket link + edit -->
@@ -97,13 +95,14 @@ function cancelEdit() {
             </a>
           </template>
           <span v-else class="text-gray-600 text-xs">No ticket linked</span>
-          <button
-            @click="startEdit(item.linearTicketId)"
+          <UiActionButton
+            variant="ghost"
+            size="sm"
             :disabled="reassigning"
-            class="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-300 border border-gray-700 hover:border-gray-600 rounded transition-colors"
+            @click="startEdit(item.linearTicketId)"
           >
             {{ reassigning ? 'Updating...' : item.linearTicketId ? 'Change' : 'Link ticket' }}
-          </button>
+          </UiActionButton>
         </template>
 
         <!-- Edit mode -->
@@ -115,12 +114,9 @@ function cancelEdit() {
             @keyup.enter="editing = false; $emit('reassign', ticketInput)"
             @keyup.escape="cancelEdit"
           />
-          <button
-            @click="editing = false; $emit('reassign', ticketInput)"
-            class="px-2 py-0.5 text-xs bg-indigo-600 hover:bg-indigo-500 rounded transition-colors"
-          >
+          <UiActionButton size="sm" @click="editing = false; $emit('reassign', ticketInput)">
             Save
-          </button>
+          </UiActionButton>
           <button
             @click="cancelEdit"
             class="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-300 transition-colors"
@@ -145,7 +141,7 @@ function cancelEdit() {
 
     <!-- Analyzed content -->
     <div v-if="item.status === 'analyzed'" class="border-t border-gray-800">
-      <!-- Business summary (shown by default) -->
+      <!-- Business summary -->
       <div class="p-5">
         <h4 class="text-sm font-semibold text-green-400 mb-2">💡 What This Means for Users</h4>
         <p class="text-sm text-gray-300 leading-relaxed">{{ item.businessSummary }}</p>
@@ -200,9 +196,10 @@ function cancelEdit() {
         </div>
       </div>
     </div>
+
     <!-- Error state -->
     <div v-if="item.status === 'error'" class="px-5 pb-5">
       <p class="text-sm text-red-400">Analysis failed. The item may be retried on next sync.</p>
     </div>
-  </div>
+  </UiCardShell>
 </template>
