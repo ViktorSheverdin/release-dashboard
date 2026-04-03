@@ -45,17 +45,17 @@ export const analyzeItem = internalAction({
     });
     if (!item) return;
 
-    const context = `
+    try {
+      const apiKey = process.env.GEMINI_API_KEY!;
+
+      const context = `
 PR #${item.prNumber}: ${item.prTitle}
 Author: ${item.prAuthor}
 Merged: ${item.prMergedAt}
 PR Description: ${item.prDiff ?? "No description"}
 ${item.linearTicketId ? `Linear Ticket: ${item.linearTicketId} - ${item.linearTitle}` : "No linked Linear ticket"}
 ${item.linearDescription ? `Ticket Description: ${item.linearDescription}` : ""}
-    `.trim();
-
-    try {
-      const apiKey = process.env.GEMINI_API_KEY!;
+      `.trim();
 
       const technicalSummary = await callGemini(
         apiKey,

@@ -81,8 +81,9 @@ const groupedItems = computed(() => {
     }
   }
 
-  // Compute status for each group
+  // Sort items within each group by merge date (most recent first) and compute status
   for (const group of groups.values()) {
+    group.items.sort((a, b) => new Date(b.prMergedAt).getTime() - new Date(a.prMergedAt).getTime())
     group.status = getGroupStatus(group.items)
   }
 
