@@ -3,7 +3,6 @@
 A real-time release dashboard that syncs GitHub PRs with Linear tickets, generates AI-powered dual-format summaries (technical + business), and distributes them to Slack.
 
 The team prefix is ARD
-Small change
 
 ## Architecture
 
