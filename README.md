@@ -1,6 +1,7 @@
 # Release Intelligence Dashboard
 
 Real-time release dashboard: syncs GitHub PRs with Linear tickets across all teams, generates AI summaries, distributes to Slack.
+small update
 
 ## File Structure
 
@@ -68,6 +69,7 @@ app/                           # Frontend (Nuxt 3 + Vue 3)
 ```
 
 Key patterns:
+
 - **Actions** = external API calls (can't write DB directly)
 - **Mutations** = transactional DB writes (can schedule actions)
 - **`ctx.scheduler.runAfter(0, ...)`** = non-blocking: items appear instantly as "pending", AI runs in background
@@ -132,6 +134,7 @@ pnpm dev                # Frontend (http://localhost:3000)
 ```
 
 Environment variables (set via `npx convex env set`):
+
 - `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`
 - `LINEAR_API_KEY`
 - `GEMINI_API_KEY`
