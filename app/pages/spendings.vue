@@ -63,44 +63,47 @@ const selectedEmployee = ref<PayrollItem | null>(null)
       <ChatPanel @intent-change="onIntentChange" />
     </div>
 
-    <!-- Dashboard + inline panes -->
-    <div style="flex: 1; min-width: 0; display: flex; overflow: hidden;">
+    <!-- Dashboard area -->
+    <div style="flex: 1; min-width: 0; position: relative; overflow: hidden;">
 
-      <!-- Main dashboard -->
-      <div style="flex: 1; min-width: 0; position: relative;">
-        <DashboardPanel
-          :view="currentView"
-          @select-transaction="onSelectTransaction"
-          @select-employee="selectedEmployee = $event"
-        />
+      <!-- Main dashboard always fills full space -->
+      <DashboardPanel
+        :view="currentView"
+        @select-transaction="onSelectTransaction"
+        @select-employee="selectedEmployee = $event"
+      />
+
+      <!-- Overlay pane container: anchored to right edge, grows leftward as panes open -->
+      <div
+        style="position: absolute; top: 0; right: 0; bottom: 0; display: flex; pointer-events: none; z-index: 10;"
+      >
+        <!-- Pane 2: Similar transactions -->
+        <Transition name="pane">
+          <div
+            v-if="selectedTransaction"
+            style="width: 300px; height: 100%; flex-shrink: 0; pointer-events: auto;"
+          >
+            <SimilarTransactionsPane
+              :transaction="selectedTransaction"
+              @select="onSelectSimilar"
+              @close="closeSimilarPane"
+            />
+          </div>
+        </Transition>
+
+        <!-- Pane 3: Transaction detail -->
+        <Transition name="pane">
+          <div
+            v-if="selectedSimilar"
+            style="width: 300px; height: 100%; flex-shrink: 0; pointer-events: auto;"
+          >
+            <TransactionDetailPane
+              :transaction="selectedSimilar"
+              @close="closeDetailPane"
+            />
+          </div>
+        </Transition>
       </div>
-
-      <!-- Pane 2: Similar transactions -->
-      <Transition name="pane">
-        <div
-          v-if="selectedTransaction"
-          style="width: 300px; flex-shrink: 0; position: relative;"
-        >
-          <SimilarTransactionsPane
-            :transaction="selectedTransaction"
-            @select="onSelectSimilar"
-            @close="closeSimilarPane"
-          />
-        </div>
-      </Transition>
-
-      <!-- Pane 3: Transaction detail -->
-      <Transition name="pane">
-        <div
-          v-if="selectedSimilar"
-          style="width: 300px; flex-shrink: 0; position: relative;"
-        >
-          <TransactionDetailPane
-            :transaction="selectedSimilar"
-            @close="closeDetailPane"
-          />
-        </div>
-      </Transition>
 
     </div>
   </div>
