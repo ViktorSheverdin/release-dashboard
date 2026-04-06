@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import type { PayrollData } from '../../types'
+import type { PayrollData, PayrollItem } from '../../types'
 
 defineProps<{
   data: PayrollData
+}>()
+
+const emit = defineEmits<{
+  selectEmployee: [item: PayrollItem]
 }>()
 
 function formatAmount(amount: number): string {
@@ -81,7 +85,9 @@ function getInitials(name: string): string {
           padding: '10px 20px',
           borderBottom: '1px solid #f7f5f2',
           transition: 'background 0.15s',
+          cursor: 'pointer',
         }"
+        @click="emit('selectEmployee', item)"
       >
         <!-- Employee -->
         <div :style="{ display: 'flex', alignItems: 'center', gap: '10px' }">
