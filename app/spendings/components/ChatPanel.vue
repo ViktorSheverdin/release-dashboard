@@ -3,7 +3,11 @@ import { useChat } from '../composables/useChat'
 import ChatMessage from './ChatMessage.vue'
 import ChatInput from './ChatInput.vue'
 
-const { messages, isResponding, sendMessage } = useChat()
+const emit = defineEmits<{
+  intentChange: [intent: string]
+}>()
+
+const { messages, isResponding, currentIntent, sendMessage } = useChat()
 
 const messagesContainer = ref<HTMLDivElement | null>(null)
 
@@ -31,81 +35,62 @@ watch(
     }
   }
 )
+
+watch(currentIntent, (intent) => {
+  if (intent) emit('intentChange', intent)
+})
 </script>
 
 <template>
-  <div
-    style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column;"
-    class="bg-[#FAFAF7]"
-  >
-    <!-- Header -->
-    <div
-      style="flex-shrink: 0;"
-      class="flex items-center gap-3 px-5 py-4 border-b border-gray-200/80 bg-white"
-    >
-      <div class="w-9 h-9 rounded-full bg-[#4A7C59] flex items-center justify-center">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 8V4H8" />
-          <rect x="8" y="8" width="8" height="8" rx="2" />
-          <path d="M2 12h2" />
-          <path d="M20 12h2" />
-          <path d="M12 2v2" />
-          <path d="M12 20v2" />
-        </svg>
-      </div>
-      <div>
-        <h2 class="text-sm font-semibold text-gray-800 leading-tight">Frank AI</h2>
-        <div class="flex items-center gap-1.5 mt-0.5">
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-          <p class="text-xs text-gray-400">Online</p>
-        </div>
-      </div>
-    </div>
+  <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: #FAFAF7;">
 
     <!-- Messages -->
     <div
       ref="messagesContainer"
-      style="flex: 1; overflow-y: auto; min-height: 0;"
-      class="px-5 py-5 space-y-4"
+      style="flex: 1; overflow-y: auto; min-height: 0; padding: 20px 16px;"
     >
-      <!-- Welcome message -->
-      <div v-if="messages.length === 0" class="flex items-center justify-center h-full">
-        <div class="text-center max-w-[260px]">
-          <div class="w-12 h-12 rounded-full bg-[#4A7C59]/10 flex items-center justify-center mx-auto mb-3">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4A7C59" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </div>
-          <h3 class="text-sm font-semibold text-gray-700 mb-1">Financial Insights</h3>
-          <p class="text-xs text-gray-400 leading-relaxed">
-            Ask about your spending, transactions, payroll, or ad spend to get started.
-          </p>
-        </div>
-      </div>
-
-      <ChatMessage
-        v-for="msg in messages"
-        :key="msg.id"
-        :message="msg"
-      />
-
-      <!-- Typing indicator -->
-      <div v-if="isResponding && !messages[messages.length - 1]?.isStreaming" class="flex gap-3 items-start">
-        <div class="w-8 h-8 rounded-full bg-[#4A7C59] flex items-center justify-center flex-shrink-0">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 8V4H8" />
-            <rect x="8" y="8" width="8" height="8" rx="2" />
-            <path d="M2 12h2" />
-            <path d="M20 12h2" />
-            <path d="M12 2v2" />
-            <path d="M12 20v2" />
+      <!-- Welcome state -->
+      <div
+        v-if="messages.length === 0"
+        style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center;"
+      >
+        <div
+          style="width: 44px; height: 44px; border-radius: 50%; background: rgba(74,124,89,0.1); display: flex; align-items: center; justify-content: center; margin-bottom: 12px;"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4A7C59" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
         </div>
-        <div class="bg-[#4A7C59] rounded-2xl rounded-tl-md px-4 py-3">
-          <div class="flex gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-white/60 animate-bounce" style="animation-delay: 0ms" />
-            <span class="w-1.5 h-1.5 rounded-full bg-white/60 animate-bounce" style="animation-delay: 150ms" />
-            <span class="w-1.5 h-1.5 rounded-full bg-white/60 animate-bounce" style="animation-delay: 300ms" />
+        <h3 style="font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px;">Welcome to Financial Insights</h3>
+        <p style="font-size: 12px; color: #9ca3af; line-height: 1.5; max-width: 220px;">
+          Ask about your spending, transactions, payroll, or ad spend to get started.
+        </p>
+      </div>
+
+      <!-- Message list -->
+      <div v-else style="display: flex; flex-direction: column; gap: 16px;">
+        <ChatMessage
+          v-for="msg in messages"
+          :key="msg.id"
+          :message="msg"
+        />
+      </div>
+
+      <!-- Typing indicator -->
+      <div
+        v-if="isResponding && !messages[messages.length - 1]?.isStreaming"
+        style="display: flex; gap: 10px; align-items: flex-start; margin-top: 16px;"
+      >
+        <div
+          style="width: 30px; height: 30px; border-radius: 50%; background: #1B4332; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
+        >
+          <span style="font-size: 11px; font-weight: 700; color: white;">F</span>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #E8E5DF; border-radius: 14px 14px 14px 4px; padding: 10px 14px;">
+          <div style="display: flex; gap: 4px;">
+            <span class="bounce-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; animation-delay: 0ms;" />
+            <span class="bounce-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; animation-delay: 150ms;" />
+            <span class="bounce-dot" style="width: 6px; height: 6px; border-radius: 50%; background: #9ca3af; animation-delay: 300ms;" />
           </div>
         </div>
       </div>
@@ -115,5 +100,29 @@ watch(
     <div style="flex-shrink: 0;">
       <ChatInput :disabled="isResponding" @send="sendMessage" />
     </div>
+
+    <!-- Footer identity -->
+    <div style="flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-top: 1px solid #e5e2dc; background: #F4F3EF;">
+      <div
+        style="width: 32px; height: 32px; border-radius: 50%; background: #1B4332; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
+      >
+        <span style="font-size: 12px; font-weight: 700; color: white;">F</span>
+      </div>
+      <div>
+        <p style="font-size: 13px; font-weight: 600; color: #374151; line-height: 1.2;">Frank, AI Assistant</p>
+        <p style="font-size: 11px; color: #9ca3af; margin-top: 1px;">Financial Insights</p>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.bounce-dot {
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-5px); }
+}
+</style>

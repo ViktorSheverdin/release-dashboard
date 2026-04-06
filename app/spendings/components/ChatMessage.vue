@@ -12,21 +12,6 @@ const formattedContent = computed(() => {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>')
 })
-
-const bubbleStyle = computed(() => {
-  if (isUser.value) {
-    return {
-      background: '#F0F0F0',
-      color: '#1f2937',
-      borderTopRightRadius: '6px',
-    }
-  }
-  return {
-    background: '#4A7C59',
-    color: '#ffffff',
-    borderTopLeftRadius: '6px',
-  }
-})
 </script>
 
 <template>
@@ -34,44 +19,41 @@ const bubbleStyle = computed(() => {
     class="message-enter"
     :style="{
       display: 'flex',
-      gap: '10px',
+      gap: '8px',
       flexDirection: isUser ? 'row-reverse' : 'row',
       alignItems: 'flex-start',
     }"
   >
-    <!-- AI avatar (only for assistant) -->
+    <!-- Avatar -->
     <div
-      v-if="!isUser"
       :style="{
-        width: '32px',
-        height: '32px',
+        width: '30px',
+        height: '30px',
         borderRadius: '50%',
-        background: '#4A7C59',
+        background: isUser ? '#E8E5DF' : '#1B4332',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: '0',
+        fontSize: '12px',
+        fontWeight: '700',
+        color: isUser ? '#6b7280' : 'white',
       }"
     >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 8V4H8" />
-        <rect x="8" y="8" width="8" height="8" rx="2" />
-        <path d="M2 12h2" />
-        <path d="M20 12h2" />
-        <path d="M12 2v2" />
-        <path d="M12 20v2" />
-      </svg>
+      {{ isUser ? 'U' : 'F' }}
     </div>
 
-    <!-- Message bubble -->
+    <!-- Bubble -->
     <div
       :style="{
-        maxWidth: '80%',
-        borderRadius: '16px',
-        padding: '10px 16px',
+        maxWidth: '82%',
+        borderRadius: isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
+        padding: '10px 14px',
         fontSize: '13px',
         lineHeight: '1.6',
-        ...bubbleStyle,
+        background: isUser ? '#ECEAE5' : '#ffffff',
+        color: '#374151',
+        border: isUser ? 'none' : '1px solid #E8E5DF',
       }"
     >
       <div v-html="formattedContent" />
@@ -79,11 +61,11 @@ const bubbleStyle = computed(() => {
         v-if="message.isStreaming"
         :style="{
           display: 'inline-block',
-          width: '6px',
-          height: '16px',
+          width: '2px',
+          height: '14px',
           marginLeft: '2px',
           verticalAlign: 'middle',
-          background: isUser ? '#6b7280' : 'rgba(255,255,255,0.7)',
+          background: '#9ca3af',
         }"
         class="animate-blink"
       />
@@ -93,18 +75,12 @@ const bubbleStyle = computed(() => {
 
 <style scoped>
 .message-enter {
-  animation: messageSlideIn 0.3s ease-out;
+  animation: messageSlideIn 0.25s ease-out;
 }
 
 @keyframes messageSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes blink {
