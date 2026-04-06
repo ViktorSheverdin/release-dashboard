@@ -1,6 +1,7 @@
 import type {
   SummaryCardData,
   BarChartData,
+  TabbedBarChartData,
   TransactionListData,
   PayrollData,
 } from '../types'
@@ -245,11 +246,42 @@ export const payrollBarChart: BarChartData = {
   ],
 }
 
+// ── Weekly snapshot tabbed chart ────────────────────────────────────
+
+export const weeklyTabbedChart: TabbedBarChartData = {
+  tabs: ['Payments', 'Expenses', 'Payroll'],
+  datasets: {
+    Payments: {
+      title: 'Incoming Payments',
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      datasets: [
+        { label: 'Payments', values: [6200, 8100, 5400, 7300, 9200, 4800, 3600], color: '#4A7C59' },
+      ],
+    },
+    Expenses: {
+      title: 'Outgoing Expenses',
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      datasets: [
+        { label: 'Expenses', values: [4800, 6200, 5100, 5900, 7100, 5200, 4200], color: '#E07A5F' },
+        { label: 'Ad Spend', values: [1200, 1800, 900, 2100, 1600, 800, 500], color: '#F2C14E' },
+      ],
+    },
+    Payroll: {
+      title: 'Payroll by Department',
+      labels: ['Eng', 'Design', 'Sales', 'Mktg', 'Ops', 'HR', 'Support'],
+      datasets: [
+        { label: 'Payroll', values: [10500, 3800, 4900, 3400, 2400, 1800, 1500], color: '#635BFF' },
+      ],
+    },
+  },
+}
+
 // ── Data map for the component registry ─────────────────────────────
 
 export const mockDataMap: Record<string, unknown> = {
   'weekly-summary-cards': weeklySummaryCards,
   'weekly-bar-chart': weeklyBarChart,
+  'weekly-tabbed-chart': weeklyTabbedChart,
   'weekly-transactions': weeklyTransactions,
   'adspend-summary-cards': adSpendSummaryCards,
   'adspend-bar-chart': adSpendBarChart,

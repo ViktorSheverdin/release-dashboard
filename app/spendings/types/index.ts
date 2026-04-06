@@ -66,7 +66,12 @@ export interface PayrollData {
 
 // ── Component registry ──────────────────────────────────────────────
 
-export type DashboardComponentType = 'summary-cards' | 'bar-chart' | 'transaction-list' | 'payroll-table'
+export interface TabbedBarChartData {
+  tabs: string[]
+  datasets: Record<string, BarChartData>
+}
+
+export type DashboardComponentType = 'summary-cards' | 'bar-chart' | 'tabbed-bar-chart' | 'transaction-list' | 'payroll-table'
 
 export interface DashboardComponentConfig {
   type: DashboardComponentType

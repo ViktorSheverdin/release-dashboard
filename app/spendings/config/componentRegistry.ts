@@ -1,17 +1,12 @@
 import type { DashboardView } from '../types'
 
-/**
- * Maps chat intents to dashboard views.
- * Each intent defines which components to render and which data keys they use.
- * The AI response will return an intent key, and the dashboard renders accordingly.
- */
 export const componentRegistry: Record<string, DashboardView> = {
   'weekly-snapshot': {
     title: 'Weekly Snapshot',
     subtitle: 'Financial overview for this week',
     components: [
       { type: 'summary-cards', dataKey: 'weekly-summary-cards' },
-      { type: 'bar-chart', dataKey: 'weekly-bar-chart' },
+      { type: 'tabbed-bar-chart', dataKey: 'weekly-tabbed-chart' },
       { type: 'transaction-list', dataKey: 'weekly-transactions' },
     ],
   },
@@ -40,6 +35,18 @@ export const componentRegistry: Record<string, DashboardView> = {
     subtitle: 'Transaction history and details',
     components: [
       { type: 'transaction-list', dataKey: 'weekly-transactions' },
+    ],
+  },
+
+  all: {
+    title: 'All Components',
+    subtitle: 'Full component library',
+    components: [
+      { type: 'summary-cards', dataKey: 'weekly-summary-cards' },
+      { type: 'tabbed-bar-chart', dataKey: 'weekly-tabbed-chart' },
+      { type: 'bar-chart', dataKey: 'adspend-bar-chart' },
+      { type: 'transaction-list', dataKey: 'weekly-transactions' },
+      { type: 'payroll-table', dataKey: 'payroll-data' },
     ],
   },
 }
