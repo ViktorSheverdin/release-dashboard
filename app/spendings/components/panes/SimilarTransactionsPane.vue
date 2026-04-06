@@ -72,6 +72,7 @@ function barWidth(amount: number) {
       height: '100%',
       background: '#FAFAF7',
       borderLeft: '1px solid #E8E5DF',
+      boxShadow: '-4px 0 16px rgba(0,0,0,0.08)',
     }"
   >
     <!-- Header -->
