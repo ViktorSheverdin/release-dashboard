@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type { DashboardView, TransactionItem, PayrollItem, SummaryCardData, BarChartData, TransactionListData, PayrollData } from '../types'
+import type { DashboardView, TransactionItem, PayrollItem, SummaryCardData, BarChartData, TabbedBarChartData, TransactionListData, PayrollData } from '../types'
 import { mockDataMap } from '../data/mockData'
 import SummaryCard from './dashboard/SummaryCard.vue'
 import BarChart from './dashboard/BarChart.vue'
+import TabbedBarChart from './dashboard/TabbedBarChart.vue'
 import TransactionList from './dashboard/TransactionList.vue'
 import PayrollTable from './dashboard/PayrollTable.vue'
 
@@ -99,6 +100,11 @@ watch(
           <BarChart
             v-else-if="comp.type === 'bar-chart'"
             :data="getData(comp.dataKey) as BarChartData"
+          />
+
+          <TabbedBarChart
+            v-else-if="comp.type === 'tabbed-bar-chart'"
+            :data="getData(comp.dataKey) as TabbedBarChartData"
           />
 
           <TransactionList

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import ChatPanel from '~/spendings/components/ChatPanel.vue'
 import DashboardPanel from '~/spendings/components/DashboardPanel.vue'
-import SlidePanel from '~/spendings/components/SlidePanel.vue'
-import TransactionDetailPanel from '~/spendings/components/panels/TransactionDetailPanel.vue'
-import EmployeeDetailPanel from '~/spendings/components/panels/EmployeeDetailPanel.vue'
+import SimilarTransactionsPane from '~/spendings/components/panes/SimilarTransactionsPane.vue'
+import TransactionDetailPane from '~/spendings/components/panes/TransactionDetailPane.vue'
 import { componentRegistry } from '~/spendings/config/componentRegistry'
 import type { DashboardView, TransactionItem, PayrollItem } from '~/spendings/types'
 
@@ -19,40 +18,41 @@ const currentView = computed<DashboardView | null>(() => {
 
 function onIntentChange(intent: string) {
   currentIntent.value = intent
+  // Reset panes when dashboard view changes
+  selectedTransaction.value = null
+  selectedSimilar.value = null
 }
 
-// ── Panel stack ──────────────────────────────────────────────────────
-interface PanelConfig {
-  type: 'transaction' | 'employee' | 'generic'
-  title: string
-  subtitle: string
-  data?: TransactionItem | PayrollItem
+// ── Multi-pane transaction state ─────────────────────────────────────
+const selectedTransaction = ref<TransactionItem | null>(null)
+const selectedSimilar = ref<TransactionItem | null>(null)
+
+function onSelectTransaction(item: TransactionItem) {
+  // Clicking a different transaction resets pane 3
+  if (selectedTransaction.value?.id !== item.id) {
+    selectedSimilar.value = null
+  }
+  selectedTransaction.value = item
 }
 
-const panelStack = ref<PanelConfig[]>([])
-
-const isPanelOpen = computed(() => panelStack.value.length > 0)
-const topPanel = computed(() => panelStack.value[panelStack.value.length - 1] ?? null)
-
-function openTransaction(item: TransactionItem) {
-  panelStack.value = [{ type: 'transaction', title: item.vendor, subtitle: item.category, data: item }]
+function onSelectSimilar(item: TransactionItem) {
+  selectedSimilar.value = item
 }
 
-function openEmployee(item: PayrollItem) {
-  panelStack.value = [{ type: 'employee', title: item.name, subtitle: item.department, data: item }]
+function closeSimilarPane() {
+  selectedTransaction.value = null
+  selectedSimilar.value = null
 }
 
-function drillDown(title: string, subtitle: string) {
-  panelStack.value = [...panelStack.value, { type: 'generic', title, subtitle }]
+function closeDetailPane() {
+  selectedSimilar.value = null
 }
 
-function popPanel() {
-  panelStack.value = panelStack.value.slice(0, -1)
-}
+// Payroll uses the legacy slide panel
+import SlidePanel from '~/spendings/components/SlidePanel.vue'
+import EmployeeDetailPanel from '~/spendings/components/panels/EmployeeDetailPanel.vue'
 
-function closePanel() {
-  panelStack.value = []
-}
+const selectedEmployee = ref<PayrollItem | null>(null)
 </script>
 
 <template>
@@ -63,78 +63,72 @@ function closePanel() {
       <ChatPanel @intent-change="onIntentChange" />
     </div>
 
-    <!-- Dashboard Panel -->
-    <div style="flex: 1; min-width: 0; position: relative;">
-      <DashboardPanel
-        :view="currentView"
-        @select-transaction="openTransaction"
-        @select-employee="openEmployee"
-      />
+    <!-- Dashboard + inline panes -->
+    <div style="flex: 1; min-width: 0; display: flex; overflow: hidden;">
+
+      <!-- Main dashboard -->
+      <div style="flex: 1; min-width: 0; position: relative;">
+        <DashboardPanel
+          :view="currentView"
+          @select-transaction="onSelectTransaction"
+          @select-employee="selectedEmployee = $event"
+        />
+      </div>
+
+      <!-- Pane 2: Similar transactions -->
+      <Transition name="pane">
+        <div
+          v-if="selectedTransaction"
+          style="width: 300px; flex-shrink: 0; position: relative;"
+        >
+          <SimilarTransactionsPane
+            :transaction="selectedTransaction"
+            @select="onSelectSimilar"
+            @close="closeSimilarPane"
+          />
+        </div>
+      </Transition>
+
+      <!-- Pane 3: Transaction detail -->
+      <Transition name="pane">
+        <div
+          v-if="selectedSimilar"
+          style="width: 300px; flex-shrink: 0; position: relative;"
+        >
+          <TransactionDetailPane
+            :transaction="selectedSimilar"
+            @close="closeDetailPane"
+          />
+        </div>
+      </Transition>
+
     </div>
   </div>
 
-  <!-- Slide Panel — renders on top of everything -->
+  <!-- Employee slide panel (payroll rows) -->
   <SlidePanel
-    :open="isPanelOpen"
-    :title="topPanel?.title"
-    :subtitle="topPanel?.subtitle"
-    :can-go-back="panelStack.length > 1"
-    @close="closePanel"
-    @back="popPanel"
+    :open="!!selectedEmployee"
+    :title="selectedEmployee?.name"
+    :subtitle="selectedEmployee?.department"
+    @close="selectedEmployee = null"
   >
-    <TransactionDetailPanel
-      v-if="topPanel?.type === 'transaction'"
-      :item="(topPanel.data as TransactionItem)"
-      :on-drill-down="drillDown"
-    />
-
     <EmployeeDetailPanel
-      v-else-if="topPanel?.type === 'employee'"
-      :item="(topPanel.data as PayrollItem)"
-      :on-drill-down="drillDown"
+      v-if="selectedEmployee"
+      :item="selectedEmployee"
     />
-
-    <!-- Generic drill-down level -->
-    <div v-else-if="topPanel?.type === 'generic'" :style="{ display: 'flex', flexDirection: 'column', gap: '16px' }">
-      <div
-        :style="{
-          padding: '20px',
-          background: 'linear-gradient(135deg, #1B4332 0%, #2D6A4F 100%)',
-          borderRadius: '12px',
-          color: 'white',
-        }"
-      >
-        <p :style="{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginBottom: '4px' }">Record</p>
-        <p :style="{ fontSize: '22px', fontWeight: '700' }">{{ topPanel.title }}</p>
-        <p :style="{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginTop: '4px' }">{{ topPanel.subtitle }}</p>
-      </div>
-      <p :style="{ fontSize: '13px', color: '#9ca3af', textAlign: 'center', paddingTop: '20px' }">
-        Full detail view coming in Phase 4.
-      </p>
-    </div>
-
-    <template #footer>
-      <div :style="{ display: 'flex', gap: '8px' }">
-        <button
-          :style="{
-            flex: '1', padding: '10px', borderRadius: '8px',
-            border: '1px solid #E8E5DF', background: 'transparent',
-            color: '#374151', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-          }"
-          @click="closePanel"
-        >
-          Dismiss
-        </button>
-        <button
-          :style="{
-            flex: '1', padding: '10px', borderRadius: '8px',
-            border: 'none', background: '#1B4332',
-            color: 'white', fontSize: '13px', fontWeight: '500', cursor: 'pointer',
-          }"
-        >
-          View Full Report
-        </button>
-      </div>
-    </template>
   </SlidePanel>
 </template>
+
+<style>
+.pane-enter-active {
+  transition: width 0.25s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease;
+}
+.pane-leave-active {
+  transition: width 0.2s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.15s ease;
+}
+.pane-enter-from,
+.pane-leave-to {
+  width: 0 !important;
+  opacity: 0;
+}
+</style>

@@ -1,6 +1,11 @@
 import type { ChatMessage } from '../types'
 
 const MOCK_RESPONSES: Record<string, { text: string; intent: string }> = {
+  all: {
+    intent: 'all',
+    text: `Here's everything in one view — all dashboard components rendered together.`,
+  },
+
   default: {
     intent: 'weekly-snapshot',
     text: `Hello Business Owner,
@@ -70,6 +75,9 @@ All payments have been processed successfully except **1 pending** and **1 proce
 
 function getResponseForMessage(message: string): { text: string; intent: string } {
   const lower = message.toLowerCase()
+  if (lower.includes('all') || lower.includes('everything') || lower.includes('component')) {
+    return MOCK_RESPONSES.all!
+  }
   if (lower.includes('payroll') || lower.includes('salary') || lower.includes('employee')) {
     return MOCK_RESPONSES.payroll!
   }
