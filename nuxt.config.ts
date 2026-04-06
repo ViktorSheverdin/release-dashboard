@@ -8,4 +8,7 @@ export default defineNuxtConfig({
       convexUrl: process.env.CONVEX_URL || '',
     },
   },
+  imports: {
+    dirs: ['spendings/composables'],
+  },
 })

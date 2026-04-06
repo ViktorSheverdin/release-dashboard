@@ -1,0 +1,20 @@
+<template>
+  <div class="min-h-screen bg-gray-950 text-gray-100">
+    <header class="border-b border-gray-800 bg-gray-900/50 backdrop-blur sticky top-0 z-10">
+      <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-sm font-bold">
+            RI
+          </div>
+          <h1 class="text-lg font-semibold tracking-tight">Release Intelligence</h1>
+        </div>
+        <NuxtLink to="/" class="text-sm text-gray-400 hover:text-gray-200 transition-colors">
+          Dashboard
+        </NuxtLink>
+      </div>
+    </header>
+    <main class="max-w-6xl mx-auto px-6 py-8">
+      <slot />
+    </main>
+  </div>
+</template>
